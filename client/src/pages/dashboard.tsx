@@ -8,6 +8,7 @@ import { BotControls } from "@/components/bot-controls";
 import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { CoinSelector } from "@/components/coin-selector";
+import { CoinPriceSlider } from "@/components/coin-price-slider";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
@@ -41,33 +42,48 @@ export default function Dashboard() {
   });
 
   // Fetch chart data for selected coin
-  const { data: chartData = [], isLoading: chartLoading } = useQuery<ChartDataPoint[]>({
+  const { data: chartData = [], isLoading: chartLoading, isError: chartError } = useQuery<ChartDataPoint[]>({
     queryKey: ['/api/chart', selectedCoin],
     queryFn: async () => {
       const encodedSymbol = encodeURIComponent(selectedCoin);
       const response = await fetch(`/api/chart/${encodedSymbol}`);
-      if (!response.ok) throw new Error('Failed to fetch chart data');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch chart data');
+      }
       return response.json();
     },
     refetchInterval: 5000,
+    retry: false, // Don't retry on Binance API requirement error
   });
 
   // Start bot mutation
   const startBotMutation = useMutation({
     mutationFn: async ({ strategy, mode }: { strategy: StrategyType; mode: TradingMode }) => {
-      return await apiRequest('POST', '/api/bot/start', { strategy, mode });
+      const response = await fetch('/api/bot/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strategy, mode }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to start bot');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bot/status'] });
       toast({
-        title: "Bot Started",
-        description: "Trading bot is now running",
+        title: t('common.success'),
+        description: t('bot.messages.started'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to start bot",
+        title: t('common.error'),
+        description: error.message || t('bot.messages.startFailed'),
         variant: "destructive",
       });
     },
@@ -81,14 +97,14 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bot/status'] });
       toast({
-        title: "Bot Stopped",
-        description: "Trading bot has been stopped",
+        title: t('common.success'),
+        description: t('bot.messages.stopped'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to stop bot",
+        title: t('common.error'),
+        description: error.message || t('bot.messages.stopFailed'),
         variant: "destructive",
       });
     },
@@ -315,6 +331,11 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Animated Coin Price Slider */}
+        <div className="mb-6">
+          <CoinPriceSlider />
+        </div>
+
         {/* Bot Controls */}
         <div className="mb-6">
           {botState && (
@@ -337,7 +358,12 @@ export default function Dashboard() {
               <h2 className="text-lg font-semibold">{t('chart.title') || 'Price Chart'}</h2>
               <CoinSelector value={selectedCoin} onValueChange={setSelectedCoin} />
             </div>
-            <PriceChart data={chartData} symbol={selectedCoin} isLoading={chartLoading} />
+            <PriceChart 
+              data={chartData} 
+              symbol={selectedCoin} 
+              isLoading={chartLoading} 
+              isError={chartError}
+            />
           </div>
           <div>
             <TradeHistory trades={trades} isLoading={tradesLoading} />

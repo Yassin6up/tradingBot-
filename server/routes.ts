@@ -73,6 +73,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start bot endpoint
   app.post("/api/bot/start", async (req, res) => {
     try {
+      // Check if Binance API is connected before starting bot
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      if (!binanceService.isApiConnected()) {
+        return res.status(400).json({ 
+          error: 'Binance API connection required', 
+          message: 'Please configure your Binance API key and secret in Settings before starting the bot.' 
+        });
+      }
+      
       const data = startBotSchema.parse(req.body);
       await tradingEngine.start(data.strategy, data.mode);
       const botState = await storage.getBotState();
@@ -116,56 +127,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chart data endpoint with symbol support
+  // Chart data endpoint with symbol support - REQUIRES Binance API
   app.get("/api/chart/:symbol?", async (req, res) => {
     try {
       const symbol = req.params.symbol || 'BTC/USDT';
       
-      // Try to fetch real data from Binance if connected
+      // Fetch real data from Binance - API connection is REQUIRED
       const { getBinanceService } = await import("./services/binance");
       const binanceService = getBinanceService();
       
-      if (binanceService.isApiConnected()) {
-        try {
-          // Fetch recent price data from Binance
-          const price = await binanceService.fetchPrice(symbol);
-          
-          // Generate recent price history (simulate OHLC from current price)
-          const now = Date.now();
-          const chartData = [];
-          
-          for (let i = 100; i >= 0; i--) {
-            const timestamp = now - (i * 5 * 60 * 1000); // 5 minutes apart
-            const variation = (Math.random() - 0.5) * (price * 0.02); // ±2% variation
-            chartData.push({
-              timestamp,
-              price: price + variation * (i / 100), // Trend toward current price
-            });
-          }
-          
-          return res.json(chartData);
-        } catch (binanceError) {
-          console.log(`Binance fetch failed for ${symbol}, using simulation`);
-        }
+      if (!binanceService.isApiConnected()) {
+        return res.status(400).json({ 
+          error: 'Binance API connection required', 
+          message: 'Please configure your Binance API key in Settings to view real-time price data.' 
+        });
       }
       
-      // Fallback to simulated data
-      const chartData = tradingEngine.getChartHistory();
-      res.json(chartData);
+      // Fetch real historical OHLCV data from Binance
+      const chartData = await binanceService.fetchOHLCV(symbol, '5m', 100);
+      
+      return res.json(chartData);
     } catch (error) {
       console.error('Error fetching chart data:', error);
       res.status(500).json({ error: 'Failed to fetch chart data' });
     }
   });
 
-  // Prices endpoint
+  // Prices endpoint - REQUIRES Binance API for real-time data
   app.get("/api/prices", async (_req, res) => {
     try {
-      const prices = tradingEngine.getCurrentPrices();
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      if (!binanceService.isApiConnected()) {
+        return res.status(400).json({ 
+          error: 'Binance API connection required', 
+          message: 'Please configure your Binance API key in Settings to view real-time prices.' 
+        });
+      }
+      
+      // Fetch real prices for all supported coins
+      const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT'];
+      const pricesMap = await binanceService.fetchPrices(symbols);
+      
+      // Convert Map to object
+      const prices: Record<string, number> = {};
+      pricesMap.forEach((price, symbol) => {
+        prices[symbol] = price;
+      });
+      
       res.json(prices);
     } catch (error) {
       console.error('Error fetching prices:', error);
-      res.status(500).json({ error: 'Failed to fetch prices' });
+      res.status(500).json({ error: 'Failed to fetch real-time prices' });
     }
   });
 

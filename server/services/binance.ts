@@ -176,6 +176,34 @@ export class BinanceService {
   }
 
   /**
+   * Fetch historical OHLCV data for charting
+   */
+  async fetchOHLCV(symbol: string, timeframe: string = '5m', limit: number = 100): Promise<any[]> {
+    if (!this.exchange) {
+      throw new Error('Binance not connected. Call connect() first.');
+    }
+
+    try {
+      const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, undefined, limit);
+      
+      // Transform OHLCV data to chart format
+      // OHLCV format: [timestamp, open, high, low, close, volume]
+      return ohlcv.map((candle: number[]) => ({
+        timestamp: candle[0],
+        price: candle[4], // Use close price
+        open: candle[1],
+        high: candle[2],
+        low: candle[3],
+        close: candle[4],
+        volume: candle[5],
+      }));
+    } catch (error) {
+      console.error(`Failed to fetch OHLCV for ${symbol}:`, error instanceof Error ? error.message : error);
+      throw new Error(`Failed to fetch historical data for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Clear price cache
    */
   clearCache(): void {

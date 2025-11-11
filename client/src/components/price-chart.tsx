@@ -1,15 +1,35 @@
 import { Card } from "@/components/ui/card";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "react-i18next";
+import { AlertCircle } from "lucide-react";
 import type { ChartDataPoint } from "@shared/schema";
 
 interface PriceChartProps {
   data: ChartDataPoint[];
   symbol?: string;
   isLoading?: boolean;
+  isError?: boolean;
+  error?: Error | null;
 }
 
-export function PriceChart({ data, symbol = "BTC/USDT", isLoading }: PriceChartProps) {
+export function PriceChart({ data, symbol = "BTC/USDT", isLoading, isError, error }: PriceChartProps) {
+  const { t } = useTranslation();
+
+  if (isError) {
+    return (
+      <Card className="p-6" data-testid="card-price-chart">
+        <div className="flex flex-col items-center justify-center h-[400px] text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+          <h3 className="text-lg font-semibold mb-2">{t('dashboard.binanceRequired')}</h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            {t('dashboard.configureBinance')}
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
   if (isLoading || data.length === 0) {
     return (
       <Card className="p-6" data-testid="card-price-chart">

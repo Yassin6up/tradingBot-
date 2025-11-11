@@ -12,6 +12,8 @@
     "profit": "الربح/الخسارة",
     "trades": "الصفقات",
     "winRate": "معدل الفوز",
+    "binanceRequired": "مطلوب API Binance",
+    "configureBinance": "قم بتكوين مفتاح Binance API في الإعدادات لعرض البيانات الحية",
     "status": {
       "running": "يعمل",
       "stopped": "متوقف"
@@ -26,6 +28,12 @@
     "actions": {
       "start": "تشغيل الروبوت",
       "stop": "إيقاف الروبوت"
+    },
+    "messages": {
+      "started": "روبوت التداول يعمل الآن",
+      "stopped": "تم إيقاف روبوت التداول",
+      "startFailed": "فشل تشغيل الروبوت",
+      "stopFailed": "فشل إيقاف الروبوت"
     },
     "strategyLabel": "استراتيجية التداول",
     "strategies": {

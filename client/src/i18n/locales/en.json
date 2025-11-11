@@ -12,6 +12,8 @@
     "profit": "Profit/Loss",
     "trades": "Trades",
     "winRate": "Win Rate",
+    "binanceRequired": "Binance API Required",
+    "configureBinance": "Configure your Binance API key in Settings to view real-time data",
     "status": {
       "running": "Running",
       "stopped": "Stopped"
@@ -26,6 +28,12 @@
     "actions": {
       "start": "Start Bot",
       "stop": "Stop Bot"
+    },
+    "messages": {
+      "started": "Trading bot is now running",
+      "stopped": "Trading bot has been stopped",
+      "startFailed": "Failed to start bot",
+      "stopFailed": "Failed to stop bot"
     },
     "strategyLabel": "Trading Strategy",
     "strategies": {
