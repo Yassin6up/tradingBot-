@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, trades, portfolioSettings, users } from "@shared/schema";
+import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, type AIDecision, trades, portfolioSettings, users } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -27,10 +27,16 @@ export interface IStorage {
   getBotState(): Promise<BotState>;
   updateBotState(state: Partial<BotState>): Promise<BotState>;
   clearTrades(): Promise<void>;
+  
+  // AI Decision methods
+  addAIDecision(decision: AIDecision): Promise<void>;
+  getAIDecisions(limit?: number): Promise<AIDecision[]>;
+  getLatestAIDecision(): Promise<AIDecision | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
   private botState: BotState;
+  private aiDecisions: AIDecision[] = [];
 
   constructor() {
     // Bot state stays in memory as it's temporary runtime state
@@ -40,6 +46,7 @@ export class DatabaseStorage implements IStorage {
       mode: 'sandbox',
       startTime: null,
       uptime: 0,
+      aiEnabled: false,
     };
     this.initializePortfolio();
   }
@@ -222,6 +229,23 @@ export class DatabaseStorage implements IStorage {
 
   async clearTrades(): Promise<void> {
     await db.delete(trades);
+  }
+
+  // AI Decision methods
+  async addAIDecision(decision: AIDecision): Promise<void> {
+    this.aiDecisions.push(decision);
+    // Keep only last 100 decisions
+    if (this.aiDecisions.length > 100) {
+      this.aiDecisions.shift();
+    }
+  }
+
+  async getAIDecisions(limit: number = 20): Promise<AIDecision[]> {
+    return this.aiDecisions.slice(-limit).reverse();
+  }
+
+  async getLatestAIDecision(): Promise<AIDecision | undefined> {
+    return this.aiDecisions[this.aiDecisions.length - 1];
   }
 }
 

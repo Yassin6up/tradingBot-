@@ -97,6 +97,36 @@ export interface BotState {
   mode: TradingMode;
   startTime: number | null;
   uptime: number;
+  aiEnabled?: boolean;  // AI-driven strategy selection
+}
+
+// AI Decision and Market Analysis Types
+
+export interface MarketConditions {
+  volatility: number;          // 0-100 scale
+  trendStrength: number;        // -100 to 100 (negative = downtrend, positive = uptrend)
+  momentum: number;             // -100 to 100
+  volumeTrend: number;          // -100 to 100
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
+export interface StrategyScore {
+  strategy: StrategyType;
+  score: number;                // 0-100
+  reasons: string[];            // Why this strategy was scored this way
+  confidence: number;           // 0-100
+}
+
+export interface AIDecision {
+  id: string;
+  timestamp: number;
+  marketConditions: MarketConditions;
+  strategyScores: StrategyScore[];
+  selectedStrategy: StrategyType;
+  previousStrategy: StrategyType;
+  reasoning: string;            // Main explanation for the decision
+  confidence: number;           // 0-100
+  expectedWinRate: number;      // 0-100
 }
 
 export interface PriceData {
