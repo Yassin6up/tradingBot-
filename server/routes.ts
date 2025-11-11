@@ -138,6 +138,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Decision endpoints
+  app.get("/api/ai/decisions", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const decisions = await storage.getAIDecisions(limit);
+      res.json(decisions);
+    } catch (error) {
+      console.error('Error fetching AI decisions:', error);
+      res.status(500).json({ error: 'Failed to fetch AI decisions' });
+    }
+  });
+
+  app.get("/api/ai/latest", async (_req, res) => {
+    try {
+      const decision = await storage.getLatestAIDecision();
+      if (decision) {
+        res.json(decision);
+      } else {
+        res.status(404).json({ error: 'No AI decisions yet' });
+      }
+    } catch (error) {
+      console.error('Error fetching latest AI decision:', error);
+      res.status(500).json({ error: 'Failed to fetch latest AI decision' });
+    }
+  });
+
+  app.post("/api/ai/toggle", async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid enabled value' });
+      }
+      
+      await tradingEngine.toggleAI(enabled);
+      const botState = await storage.getBotState();
+      res.json(botState);
+    } catch (error) {
+      console.error('Error toggling AI:', error);
+      res.status(500).json({ error: 'Failed to toggle AI' });
+    }
+  });
+
   // Strategies endpoint
   app.get("/api/strategies", async (_req, res) => {
     try {

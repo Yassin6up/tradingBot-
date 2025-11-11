@@ -1,6 +1,7 @@
-import type { Trade, StrategyType, TradingMode, PriceData, ChartDataPoint } from "@shared/schema";
+import type { Trade, StrategyType, TradingMode, PriceData, ChartDataPoint, AIDecision } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
+import { strategyAI } from "./services/strategy-ai";
 
 interface StrategyConfig {
   riskPerTrade: number;
@@ -40,11 +41,15 @@ const symbols = [
 
 class TradingEngine {
   private intervalId: NodeJS.Timeout | null = null;
+  private aiIntervalId: NodeJS.Timeout | null = null;
   private priceData: Map<string, number> = new Map();
   private chartHistory: ChartDataPoint[] = [];
   private currentStrategy: StrategyType = 'balanced';
   private mode: TradingMode = 'sandbox';
   private wsClients: Set<any> = new Set();
+  private lastStrategyChangeTime: number = 0;
+  private readonly MIN_STRATEGY_DWELL_MS = 300000; // 5 minutes minimum between strategy changes
+  private readonly AI_CHECK_INTERVAL_MS = 60000; // Check AI every 60 seconds
 
   constructor() {
     // Initialize price data
@@ -103,7 +108,9 @@ class TradingEngine {
 
     this.currentStrategy = strategy;
     this.mode = mode;
+    this.lastStrategyChangeTime = Date.now();
 
+    const botState = await storage.getBotState();
     await storage.updateBotState({
       status: 'running',
       strategy,
@@ -117,7 +124,12 @@ class TradingEngine {
       this.maybeExecuteTrade();
     }, 2000);
 
-    console.log(`Trading bot started with ${strategy} strategy in ${mode} mode`);
+    // Start AI analysis if enabled
+    if (botState.aiEnabled) {
+      this.startAIAnalysis();
+    }
+
+    console.log(`Trading bot started with ${strategy} strategy in ${mode} mode${botState.aiEnabled ? ' (AI enabled)' : ''}`);
   }
 
   public async stop() {
@@ -125,6 +137,8 @@ class TradingEngine {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+
+    this.stopAIAnalysis();
 
     await storage.updateBotState({
       status: 'stopped',
@@ -136,8 +150,91 @@ class TradingEngine {
 
   public async changeStrategy(strategy: StrategyType) {
     this.currentStrategy = strategy;
+    this.lastStrategyChangeTime = Date.now();
     await storage.updateBotState({ strategy });
     console.log(`Strategy changed to ${strategy}`);
+  }
+
+  public async toggleAI(enabled: boolean) {
+    await storage.updateBotState({ aiEnabled: enabled });
+    
+    if (enabled && this.intervalId) {
+      // Bot is running, start AI analysis
+      this.startAIAnalysis();
+      console.log('AI strategy selection enabled');
+    } else {
+      // Stop AI analysis
+      this.stopAIAnalysis();
+      console.log('AI strategy selection disabled');
+    }
+  }
+
+  private startAIAnalysis() {
+    if (this.aiIntervalId) {
+      return; // Already running
+    }
+
+    // Run analysis immediately, then every 60 seconds
+    this.runAIAnalysis();
+    this.aiIntervalId = setInterval(() => {
+      this.runAIAnalysis();
+    }, this.AI_CHECK_INTERVAL_MS);
+  }
+
+  private stopAIAnalysis() {
+    if (this.aiIntervalId) {
+      clearInterval(this.aiIntervalId);
+      this.aiIntervalId = null;
+    }
+  }
+
+  private async runAIAnalysis() {
+    try {
+      // Feed current price data to AI
+      const priceData = this.getCurrentPrices();
+      strategyAI.updatePriceData(priceData);
+
+      // Get AI recommendation
+      const decision = strategyAI.selectBestStrategy(this.currentStrategy);
+      
+      // Store decision
+      await storage.addAIDecision(decision);
+      
+      // Broadcast AI decision
+      this.broadcast('ai_decision', decision);
+      
+      // Apply strategy change if recommended and guard-rails pass
+      await this.applyAIStrategyDecision(decision);
+      
+      console.log(`AI Analysis: Recommended ${decision.selectedStrategy} (confidence: ${decision.confidence}%)`);
+    } catch (error) {
+      console.error('Error in AI analysis:', error);
+    }
+  }
+
+  private async applyAIStrategyDecision(decision: AIDecision) {
+    // Guard-rail: Check if strategy is different
+    if (decision.selectedStrategy === this.currentStrategy) {
+      return; // No change needed
+    }
+
+    // Guard-rail: Check minimum dwell time (prevent thrashing)
+    const timeSinceLastChange = Date.now() - this.lastStrategyChangeTime;
+    if (timeSinceLastChange < this.MIN_STRATEGY_DWELL_MS) {
+      console.log(`AI: Delaying strategy change (${Math.round((this.MIN_STRATEGY_DWELL_MS - timeSinceLastChange) / 1000)}s remaining)`);
+      return;
+    }
+
+    // Guard-rail: Check confidence threshold
+    const MIN_CONFIDENCE = 60;
+    if (decision.confidence < MIN_CONFIDENCE) {
+      console.log(`AI: Confidence too low (${decision.confidence}% < ${MIN_CONFIDENCE}%)`);
+      return;
+    }
+
+    // All guard-rails passed, apply strategy change
+    console.log(`AI: Changing strategy from ${this.currentStrategy} to ${decision.selectedStrategy}`);
+    await this.changeStrategy(decision.selectedStrategy);
   }
 
   private updatePrices() {
