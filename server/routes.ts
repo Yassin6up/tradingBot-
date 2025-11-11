@@ -18,10 +18,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Trades endpoint
-  app.get("/api/trades", async (_req, res) => {
+  // Trades endpoint with optional filtering
+  app.get("/api/trades", async (req, res) => {
     try {
-      const trades = await storage.getTrades();
+      const { symbol, strategy, timeRange, startDate, endDate } = req.query;
+      
+      const filters: any = {};
+      
+      if (symbol && typeof symbol === 'string') {
+        filters.symbol = symbol;
+      }
+      
+      if (strategy && typeof strategy === 'string' && ['safe', 'balanced', 'aggressive'].includes(strategy)) {
+        filters.strategy = strategy;
+      }
+      
+      if (timeRange && typeof timeRange === 'string' && ['24h', '7d', '30d', 'all'].includes(timeRange)) {
+        filters.timeRange = timeRange;
+      }
+      
+      if (startDate && typeof startDate === 'string') {
+        const parsed = parseInt(startDate, 10);
+        if (!isNaN(parsed)) {
+          filters.startDate = parsed;
+        }
+      }
+      
+      if (endDate && typeof endDate === 'string') {
+        const parsed = parseInt(endDate, 10);
+        if (!isNaN(parsed)) {
+          filters.endDate = parsed;
+        }
+      }
+      
+      const trades = await storage.getTrades(Object.keys(filters).length > 0 ? filters : undefined);
       res.json(trades);
     } catch (error) {
       console.error('Error fetching trades:', error);

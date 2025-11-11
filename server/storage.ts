@@ -1,7 +1,17 @@
 import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, trades, portfolioSettings, users } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+
+export type TimeRange = '24h' | '7d' | '30d' | 'all';
+
+export interface TradeFilters {
+  symbol?: string;
+  strategy?: StrategyType;
+  timeRange?: TimeRange;
+  startDate?: number; // timestamp (alternative to timeRange)
+  endDate?: number;   // timestamp (alternative to timeRange)
+}
 
 export interface IStorage {
   // User methods
@@ -10,7 +20,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   
   // Trading methods
-  getTrades(): Promise<Trade[]>;
+  getTrades(filters?: TradeFilters): Promise<Trade[]>;
   addTrade(trade: Trade): Promise<Trade>;
   getPortfolio(): Promise<Portfolio>;
   updatePortfolio(portfolio: Partial<Portfolio>): Promise<Portfolio>;
@@ -64,8 +74,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Trading methods
-  async getTrades(): Promise<Trade[]> {
-    const rows = await db.select().from(trades).orderBy(desc(trades.timestamp));
+  async getTrades(filters?: TradeFilters): Promise<Trade[]> {
+    // Build where conditions based on filters
+    const conditions = [];
+    
+    if (filters?.symbol) {
+      conditions.push(eq(trades.symbol, filters.symbol));
+    }
+    
+    if (filters?.strategy) {
+      conditions.push(eq(trades.strategy, filters.strategy));
+    }
+    
+    // Handle timeRange parameter
+    if (filters?.timeRange && filters.timeRange !== 'all') {
+      const now = Date.now();
+      const timeRanges: Record<TimeRange, number> = {
+        'all': 0,
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000,
+      };
+      const range = timeRanges[filters.timeRange];
+      const startDate = now - range;
+      conditions.push(gte(trades.timestamp, new Date(startDate)));
+    }
+    
+    // Handle explicit date range (overrides timeRange if both provided)
+    if (filters?.startDate) {
+      conditions.push(gte(trades.timestamp, new Date(filters.startDate)));
+    }
+    
+    if (filters?.endDate) {
+      conditions.push(lte(trades.timestamp, new Date(filters.endDate)));
+    }
+    
+    // Execute query with filters
+    const rows = conditions.length > 0
+      ? await db.select().from(trades).where(and(...conditions)).orderBy(desc(trades.timestamp))
+      : await db.select().from(trades).orderBy(desc(trades.timestamp));
     
     // Convert database rows to application Trade type
     return rows.map(row => ({
