@@ -4,6 +4,7 @@ import { StatCard } from "@/components/stat-card";
 import { PriceChart } from "@/components/price-chart";
 import { TradeHistory } from "@/components/trade-history";
 import { BotControls } from "@/components/bot-controls";
+import { Navigation } from "@/components/navigation";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
@@ -243,7 +244,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-6 py-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold" data-testid="text-app-title">AI Trading Bot</h1>
@@ -263,6 +264,7 @@ export default function Dashboard() {
               }`} data-testid="indicator-header-bot-status"></div>
             </div>
           </div>
+          <Navigation />
         </div>
       </header>
 
