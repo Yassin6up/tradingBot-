@@ -16,6 +16,10 @@ export default {
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
+        // Trading-specific colors
+        profit: "hsl(142 76% 36% / <alpha-value>)",
+        loss: "hsl(0 84% 60% / <alpha-value>)",
+        warning: "hsl(43 96% 56% / <alpha-value>)",
         card: {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
@@ -83,9 +87,12 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
+        sans: ["Inter", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        mono: ["JetBrains Mono", "Fira Code", "monospace"],
+      },
+      fontFeatureSettings: {
+        numeric: '"tnum"',
       },
       keyframes: {
         "accordion-down": {
