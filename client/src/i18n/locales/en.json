@@ -92,8 +92,9 @@
     "noTrades": "No trades yet. Start the bot to begin trading."
   },
   "chart": {
-    "title": "BTC Price Chart",
-    "price": "Price (USD)"
+    "title": "Price Chart",
+    "price": "Price (USD)",
+    "selectCoin": "Select Coin"
   },
   "common": {
     "loading": "Loading...",

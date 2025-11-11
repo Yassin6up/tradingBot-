@@ -7,6 +7,7 @@ import { TradeHistory } from "@/components/trade-history";
 import { BotControls } from "@/components/bot-controls";
 import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
+import { CoinSelector } from "@/components/coin-selector";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
@@ -17,6 +18,7 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const [uptime, setUptime] = useState(0);
   const [latestAIDecision, setLatestAIDecision] = useState<AIDecision | null>(null);
+  const [selectedCoin, setSelectedCoin] = useState<string>('BTC/USDT');
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
 
@@ -38,9 +40,15 @@ export default function Dashboard() {
     refetchInterval: 2000,
   });
 
-  // Fetch chart data
+  // Fetch chart data for selected coin
   const { data: chartData = [], isLoading: chartLoading } = useQuery<ChartDataPoint[]>({
-    queryKey: ['/api/chart'],
+    queryKey: ['/api/chart', selectedCoin],
+    queryFn: async () => {
+      const encodedSymbol = encodeURIComponent(selectedCoin);
+      const response = await fetch(`/api/chart/${encodedSymbol}`);
+      if (!response.ok) throw new Error('Failed to fetch chart data');
+      return response.json();
+    },
     refetchInterval: 5000,
   });
 
@@ -277,7 +285,7 @@ export default function Dashboard() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
-            title="Total Balance"
+            title={t('dashboard.balance')}
             value={portfolio ? formatCurrency(portfolio.balance) : '$0.00'}
             change={portfolio?.totalProfit}
             changePercent={portfolio?.totalProfitPercent}
@@ -285,7 +293,7 @@ export default function Dashboard() {
             isLoading={portfolioLoading}
           />
           <StatCard
-            title="Daily Profit"
+            title={t('dashboard.profit')}
             value={portfolio ? formatCurrency(portfolio.dailyProfit) : '$0.00'}
             change={portfolio?.dailyProfit}
             changePercent={portfolio?.dailyProfitPercent}
@@ -293,13 +301,13 @@ export default function Dashboard() {
             isLoading={portfolioLoading}
           />
           <StatCard
-            title="Open Positions"
+            title={t('dashboard.trades')}
             value={portfolio?.openPositions.toString() || '0'}
             icon={<Activity className="h-4 w-4" />}
             isLoading={portfolioLoading}
           />
           <StatCard
-            title="Win Rate"
+            title={t('dashboard.winRate')}
             value={portfolio ? formatPercent(portfolio.winRate) : '0.0%'}
             change={portfolio?.winningTrades}
             icon={<Target className="h-4 w-4" />}
@@ -324,8 +332,12 @@ export default function Dashboard() {
 
         {/* Charts and Trade History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <PriceChart data={chartData} isLoading={chartLoading} />
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{t('chart.title') || 'Price Chart'}</h2>
+              <CoinSelector value={selectedCoin} onValueChange={setSelectedCoin} />
+            </div>
+            <PriceChart data={chartData} symbol={selectedCoin} isLoading={chartLoading} />
           </div>
           <div>
             <TradeHistory trades={trades} isLoading={tradesLoading} />

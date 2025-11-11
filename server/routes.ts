@@ -116,9 +116,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chart data endpoint
-  app.get("/api/chart", async (_req, res) => {
+  // Chart data endpoint with symbol support
+  app.get("/api/chart/:symbol?", async (req, res) => {
     try {
+      const symbol = req.params.symbol || 'BTC/USDT';
+      
+      // Try to fetch real data from Binance if connected
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      if (binanceService.isApiConnected()) {
+        try {
+          // Fetch recent price data from Binance
+          const price = await binanceService.fetchPrice(symbol);
+          
+          // Generate recent price history (simulate OHLC from current price)
+          const now = Date.now();
+          const chartData = [];
+          
+          for (let i = 100; i >= 0; i--) {
+            const timestamp = now - (i * 5 * 60 * 1000); // 5 minutes apart
+            const variation = (Math.random() - 0.5) * (price * 0.02); // ±2% variation
+            chartData.push({
+              timestamp,
+              price: price + variation * (i / 100), // Trend toward current price
+            });
+          }
+          
+          return res.json(chartData);
+        } catch (binanceError) {
+          console.log(`Binance fetch failed for ${symbol}, using simulation`);
+        }
+      }
+      
+      // Fallback to simulated data
       const chartData = tradingEngine.getChartHistory();
       res.json(chartData);
     } catch (error) {
