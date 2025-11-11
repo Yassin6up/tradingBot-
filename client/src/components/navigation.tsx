@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Brain } from "lucide-react";
+import { LayoutDashboard, Brain, Settings } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -7,6 +7,7 @@ export function Navigation() {
   const navItems = [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/analytics", label: "AI Analytics", icon: Brain },
+    { path: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (

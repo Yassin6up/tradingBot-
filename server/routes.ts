@@ -216,6 +216,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Binance API Integration endpoints
+  app.post("/api/binance/test", async (req, res) => {
+    try {
+      const { createTemporaryBinanceService } = await import("./services/binance");
+      
+      // Create a temporary service instance with provided config for testing
+      // This doesn't affect the singleton instance
+      const testService = createTemporaryBinanceService(req.body);
+      
+      // Try to connect and test
+      const result = await testService.testConnection();
+      
+      // If test is successful and credentials were provided, update the singleton
+      if (result.success && (req.body.apiKey || req.body.secret)) {
+        const { getBinanceService } = await import("./services/binance");
+        // Reconfigure the singleton with the new credentials and connect
+        const service = getBinanceService(req.body);
+        await service.connect();
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Binance test connection error:', error);
+      res.json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection test failed',
+      });
+    }
+  });
+
+  app.get("/api/binance/status", async (_req, res) => {
+    try {
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      res.json({
+        connected: binanceService.isApiConnected(),
+        message: binanceService.isApiConnected() ? 'Connected to Binance' : 'Not connected',
+      });
+    } catch (error) {
+      res.json({ connected: false, message: 'Error checking status' });
+    }
+  });
+
+  app.get("/api/binance/prices", async (req, res) => {
+    try {
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      if (!binanceService.isApiConnected()) {
+        return res.status(503).json({ error: 'Binance not connected' });
+      }
+
+      const symbols = req.query.symbols ? 
+        (req.query.symbols as string).split(',') : 
+        ['BTC/USDT', 'ETH/USDT', 'BNB/USDT'];
+
+      const prices = await binanceService.fetchPrices(symbols);
+      
+      // Convert Map to object
+      const pricesObj: Record<string, number> = {};
+      prices.forEach((price, symbol) => {
+        pricesObj[symbol] = price;
+      });
+
+      res.json(pricesObj);
+    } catch (error) {
+      console.error('Error fetching Binance prices:', error);
+      res.status(500).json({ error: 'Failed to fetch prices from Binance' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server setup on /ws path
