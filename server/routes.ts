@@ -288,6 +288,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Risk Management endpoints
+  app.get("/api/risk/metrics", async (_req, res) => {
+    try {
+      const metrics = await tradingEngine.getRiskMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching risk metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch risk metrics' });
+    }
+  });
+
+  app.post("/api/risk/circuit-breaker/reset", async (_req, res) => {
+    try {
+      tradingEngine.resetCircuitBreaker();
+      res.json({ message: 'Circuit breaker reset successfully' });
+    } catch (error) {
+      console.error('Error resetting circuit breaker:', error);
+      res.status(500).json({ error: 'Failed to reset circuit breaker' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server setup on /ws path

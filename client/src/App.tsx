@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import "./i18n/config"; // Initialize i18n
 
 function Router() {
   return (

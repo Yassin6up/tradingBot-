@@ -1,0 +1,111 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "analytics": "AI Analytics",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "AI Trading Bot",
+    "subtitle": "Real-time Analytics & Automated Trading",
+    "currentBalance": "Current Balance",
+    "balance": "Balance",
+    "profit": "Profit/Loss",
+    "trades": "Trades",
+    "winRate": "Win Rate",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped"
+    }
+  },
+  "botControls": {
+    "title": "Bot Controls",
+    "startBot": "Start Bot",
+    "stopBot": "Stop Bot",
+    "strategy": "Strategy",
+    "mode": "Mode",
+    "sandbox": "Sandbox",
+    "real": "Real Trading",
+    "uptime": "Uptime",
+    "safe": "Safe",
+    "balanced": "Balanced",
+    "aggressive": "Aggressive"
+  },
+  "aiControl": {
+    "title": "AI Strategy Selection",
+    "description": "Let AI automatically select the best trading strategy based on market conditions",
+    "enable": "Enable AI",
+    "status": "AI Status",
+    "off": "Off",
+    "active": "Active",
+    "analyzing": "AI is analyzing market conditions...",
+    "recommendation": "Recommendation",
+    "confidence": "Confidence",
+    "marketConditions": "Market Conditions",
+    "volatility": "Volatility",
+    "trendStrength": "Trend Strength",
+    "momentum": "Momentum",
+    "riskLevel": "Risk Level"
+  },
+  "analytics": {
+    "title": "AI Decision Analytics",
+    "subtitle": "Transparent view into AI strategy selection",
+    "confidenceTrend": "AI Confidence Over Time",
+    "decisionHistory": "Decision History",
+    "decisions": "decisions",
+    "loading": "Loading chart data...",
+    "noDecisions": "No AI decisions yet. Enable AI and start the bot to see analytics.",
+    "reasoning": "Reasoning",
+    "strategyScores": "Strategy Scores"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Configure Binance API and trading parameters",
+    "binanceConfig": "Binance API Configuration",
+    "connected": "Connected",
+    "notConnected": "Not Connected",
+    "note": "Note",
+    "binanceNote": "Binance API integration allows you to fetch real-time market data and execute live trades. You can test the connection without providing credentials to fetch public price data. For trading operations, you'll need to provide your Binance API key and secret.",
+    "apiKey": "API Key (Optional)",
+    "apiSecret": "API Secret (Optional)",
+    "testnet": "Use Testnet (Sandbox Mode)",
+    "testConnection": "Test Connection",
+    "testing": "Testing Connection...",
+    "howTo": "How to Get Binance API Credentials",
+    "step1": "Log in to your Binance account",
+    "step2": "Go to Account → API Management",
+    "step3": "Create a new API key with appropriate permissions",
+    "step4": "Copy the API Key and Secret Key",
+    "step5": "Paste them in the fields above",
+    "step6": "For safety, enable \"Restrict access to trusted IPs only\"",
+    "step7": "Enable only \"Enable Reading\" for monitoring, or \"Enable Spot & Margin Trading\" for automated trading",
+    "securityWarning": "Security Warning",
+    "securityNote": "Never share your API secret with anyone. Store it securely and only use it in trusted applications. Consider using the testnet/sandbox mode first to test the bot without risking real funds."
+  },
+  "trades": {
+    "title": "Recent Trades",
+    "buy": "BUY",
+    "sell": "SELL",
+    "price": "Price",
+    "quantity": "Quantity",
+    "profit": "Profit",
+    "time": "Time",
+    "noTrades": "No trades yet. Start the bot to begin trading."
+  },
+  "chart": {
+    "title": "BTC Price Chart",
+    "price": "Price (USD)"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "extreme": "Extreme"
+  }
+}

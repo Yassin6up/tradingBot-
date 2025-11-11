@@ -2,6 +2,7 @@ import type { Trade, StrategyType, TradingMode, PriceData, ChartDataPoint, AIDec
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { strategyAI } from "./services/strategy-ai";
+import { getRiskManagementService, type RiskMetrics } from "./services/risk-management";
 
 interface StrategyConfig {
   riskPerTrade: number;
@@ -50,8 +51,13 @@ class TradingEngine {
   private lastStrategyChangeTime: number = 0;
   private readonly MIN_STRATEGY_DWELL_MS = 300000; // 5 minutes minimum between strategy changes
   private readonly AI_CHECK_INTERVAL_MS = 60000; // Check AI every 60 seconds
+  private dailyStartBalance: number = 0; // Will be initialized from portfolio
+  private lastDailyReset: string = new Date().toISOString().split('T')[0];
 
   constructor() {
+    // Initialize daily start balance from portfolio
+    this.initializeDailyBalance();
+    
     // Initialize price data
     this.priceData.set('BTC/USDT', 50000);
     this.priceData.set('ETH/USDT', 3000);
@@ -61,6 +67,16 @@ class TradingEngine {
 
     // Initialize chart history
     this.initializeChartHistory();
+  }
+
+  private async initializeDailyBalance() {
+    try {
+      const portfolio = await storage.getPortfolio();
+      this.dailyStartBalance = portfolio.balance;
+    } catch (error) {
+      console.error('Failed to initialize daily balance:', error);
+      this.dailyStartBalance = 10000; // Fallback
+    }
   }
 
   private initializeChartHistory() {
@@ -109,6 +125,19 @@ class TradingEngine {
     this.currentStrategy = strategy;
     this.mode = mode;
     this.lastStrategyChangeTime = Date.now();
+
+    // Initialize/refresh daily start balance when bot starts
+    const portfolio = await storage.getPortfolio();
+    const today = new Date().toISOString().split('T')[0];
+    if (today !== this.lastDailyReset) {
+      this.dailyStartBalance = portfolio.balance;
+      this.lastDailyReset = today;
+      const riskMgmt = getRiskManagementService();
+      riskMgmt.resetCircuitBreaker();
+    } else if (this.dailyStartBalance === 0) {
+      // First start or restart mid-day
+      this.dailyStartBalance = portfolio.balance;
+    }
 
     const botState = await storage.getBotState();
     await storage.updateBotState({
@@ -278,6 +307,45 @@ class TradingEngine {
   }
 
   private async maybeExecuteTrade() {
+    // Reset daily start balance if new day
+    const today = new Date().toISOString().split('T')[0];
+    if (today !== this.lastDailyReset) {
+      const portfolio = await storage.getPortfolio();
+      this.dailyStartBalance = portfolio.balance;
+      this.lastDailyReset = today;
+      
+      // Reset circuit breaker for new day
+      const riskMgmt = getRiskManagementService();
+      riskMgmt.resetCircuitBreaker();
+      console.log('📅 New trading day: Daily loss limit reset');
+    }
+
+    // Check risk management circuit breaker
+    const portfolio = await storage.getPortfolio();
+    const riskMgmt = getRiskManagementService();
+    const riskMetrics = riskMgmt.calculateRiskMetrics(
+      this.chartHistory,
+      portfolio.balance,
+      portfolio.initialBalance,
+      this.currentStrategy,
+      this.dailyStartBalance
+    );
+
+    // Circuit breaker: Stop trading if daily loss limit exceeded
+    if (riskMetrics.circuitBreakerActive) {
+      console.warn('🛑 Circuit breaker active - Stopping bot due to daily loss limit');
+      await this.stop();
+      
+      // Broadcast circuit breaker event
+      this.broadcast('circuit_breaker', {
+        message: 'Trading stopped: Daily loss limit exceeded',
+        dailyLoss: this.dailyStartBalance - portfolio.balance,
+        dailyLossLimit: riskMetrics.dailyLossLimit,
+      });
+      
+      return;
+    }
+
     // Random chance to execute a trade (30% chance every interval)
     if (Math.random() > 0.3) {
       return;
@@ -290,9 +358,9 @@ class TradingEngine {
     // Randomly decide buy or sell
     const type: 'BUY' | 'SELL' = Math.random() > 0.5 ? 'BUY' : 'SELL';
 
-    // Calculate trade details
-    const portfolio = await storage.getPortfolio();
-    const tradeAmount = portfolio.balance * config.riskPerTrade;
+    // Use risk-adjusted position sizing
+    const positionSize = riskMetrics.recommendedPositionSize;
+    const tradeAmount = Math.min(positionSize, portfolio.balance * config.riskPerTrade);
     const quantity = tradeAmount / currentPrice;
 
     // Simulate profit/loss (70% win rate for safe, 60% for balanced, 50% for aggressive)
@@ -346,6 +414,24 @@ class TradingEngine {
       });
     });
     return prices;
+  }
+
+  public async getRiskMetrics(): Promise<RiskMetrics> {
+    const portfolio = await storage.getPortfolio();
+    const riskMgmt = getRiskManagementService();
+    
+    return riskMgmt.calculateRiskMetrics(
+      this.chartHistory,
+      portfolio.balance,
+      portfolio.initialBalance,
+      this.currentStrategy,
+      this.dailyStartBalance
+    );
+  }
+
+  public resetCircuitBreaker() {
+    const riskMgmt = getRiskManagementService();
+    riskMgmt.resetCircuitBreaker();
   }
 }
 

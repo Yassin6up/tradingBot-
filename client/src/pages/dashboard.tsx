@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { StatCard } from "@/components/stat-card";
 import { PriceChart } from "@/components/price-chart";
 import { TradeHistory } from "@/components/trade-history";
 import { BotControls } from "@/components/bot-controls";
 import { Navigation } from "@/components/navigation";
+import { LanguageSelector } from "@/components/language-selector";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
@@ -12,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Portfolio, BotState, Trade, ChartDataPoint, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [uptime, setUptime] = useState(0);
   const [latestAIDecision, setLatestAIDecision] = useState<AIDecision | null>(null);
   const { toast } = useToast();
@@ -247,14 +250,15 @@ export default function Dashboard() {
         <div className="container mx-auto px-6 py-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold" data-testid="text-app-title">AI Trading Bot</h1>
+              <h1 className="text-2xl font-bold" data-testid="text-app-title">{t('dashboard.title')}</h1>
               <p className="text-sm text-muted-foreground" data-testid="text-app-subtitle">
-                Real-time Analytics & Automated Trading
+                {t('dashboard.subtitle')}
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <LanguageSelector />
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Current Balance</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.currentBalance')}</p>
                 <p className="text-xl font-bold tabular-nums" data-testid="text-header-balance">
                   {portfolio ? formatCurrency(portfolio.balance) : '$0.00'}
                 </p>
