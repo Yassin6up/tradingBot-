@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
+import { LanguageSelector } from "@/components/language-selector";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Brain, TrendingUp, AlertCircle, Activity } from "lucide-react";
 import type { AIDecision } from "@shared/schema";
 
 export default function Analytics() {
+  const { t } = useTranslation();
   const { data: decisions = [], isLoading } = useQuery<AIDecision[]>({
     queryKey: ['/api/ai/decisions'],
     queryFn: async () => {
@@ -44,14 +47,17 @@ export default function Analytics() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <Brain className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="text-analytics-title">AI Decision Analytics</h1>
-              <p className="text-sm text-muted-foreground">
-                Transparent view into AI strategy selection
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Brain className="h-6 w-6 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold" data-testid="text-analytics-title">{t('analytics.title')}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {t('analytics.subtitle')}
+                </p>
+              </div>
             </div>
+            <LanguageSelector />
           </div>
           <Navigation />
         </div>
@@ -62,11 +68,11 @@ export default function Analytics() {
         <Card className="p-6 mb-6" data-testid="card-confidence-chart">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">AI Confidence Over Time</h2>
+            <h2 className="text-lg font-semibold">{t('analytics.confidenceTrend')}</h2>
           </div>
           {isLoading ? (
             <div className="h-64 flex items-center justify-center text-muted-foreground">
-              Loading chart data...
+              {t('analytics.loading')}
             </div>
           ) : confidenceChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -102,7 +108,7 @@ export default function Analytics() {
           ) : (
             <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
               <AlertCircle className="h-12 w-12 mb-2 opacity-50" />
-              <p>No AI decisions yet. Enable AI and start the bot to see analytics.</p>
+              <p>{t('analytics.noDecisions')}</p>
             </div>
           )}
         </Card>
@@ -111,8 +117,8 @@ export default function Analytics() {
         <Card className="p-6" data-testid="card-decision-history">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Decision History</h2>
-            <Badge variant="outline" className="ml-auto">{decisions.length} decisions</Badge>
+            <h2 className="text-lg font-semibold">{t('analytics.decisionHistory')}</h2>
+            <Badge variant="outline" className="ml-auto">{decisions.length} {t('analytics.decisions')}</Badge>
           </div>
 
           {isLoading ? (
@@ -179,7 +185,7 @@ export default function Analytics() {
 
                       {decision.strategyScores && decision.strategyScores.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-border">
-                          <p className="text-xs text-muted-foreground mb-2">Strategy Scores:</p>
+                          <p className="text-xs text-muted-foreground mb-2">{t('analytics.strategyScores')}:</p>
                           <div className="grid grid-cols-3 gap-2">
                             {decision.strategyScores.map((score) => (
                               <div key={score.strategy} className="text-center p-2 rounded bg-muted/30">

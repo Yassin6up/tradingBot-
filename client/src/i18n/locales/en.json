@@ -161,6 +161,7 @@
     "low": "Low",
     "medium": "Medium",
     "high": "High",
-    "extreme": "Extreme"
+    "extreme": "Extreme",
+    "testConnectionFailed": "Failed to test connection"
   }
 }

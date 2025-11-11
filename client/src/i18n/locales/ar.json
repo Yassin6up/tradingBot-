@@ -161,6 +161,7 @@
     "low": "منخفض",
     "medium": "متوسط",
     "high": "عالي",
-    "extreme": "شديد"
+    "extreme": "شديد",
+    "testConnectionFailed": "فشل اختبار الاتصال"
   }
 }

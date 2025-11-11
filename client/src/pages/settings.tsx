@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
+import { LanguageSelector } from "@/components/language-selector";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState("");
   const [secret, setSecret] = useState("");
@@ -35,12 +38,12 @@ export default function Settings() {
     onSuccess: (data: any) => {
       if (data.success) {
         toast({
-          title: "Connection Successful",
+          title: t('common.success'),
           description: data.message,
         });
       } else {
         toast({
-          title: "Connection Failed",
+          title: t('common.error'),
           description: data.message,
           variant: "destructive",
         });
@@ -48,8 +51,8 @@ export default function Settings() {
     },
     onError: (error) => {
       toast({
-        title: "Connection Error",
-        description: error instanceof Error ? error.message : "Failed to test connection",
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('settings.testConnectionFailed'),
         variant: "destructive",
       });
     },
@@ -59,14 +62,17 @@ export default function Settings() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <SettingsIcon className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
-              <p className="text-sm text-muted-foreground">
-                Configure Binance API and trading parameters
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <SettingsIcon className="h-6 w-6 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold" data-testid="text-settings-title">{t('settings.title')}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.subtitle')}
+                </p>
+              </div>
             </div>
+            <LanguageSelector />
           </div>
           <Navigation />
         </div>
@@ -77,7 +83,7 @@ export default function Settings() {
         <Card className="p-6 mb-6" data-testid="card-binance-config">
           <div className="flex items-center gap-2 mb-6">
             <Plug className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Binance API Configuration</h2>
+            <h2 className="text-lg font-semibold">{t('settings.binanceConfig')}</h2>
             {status && (
               <Badge
                 variant={status.connected ? "default" : "secondary"}
@@ -85,9 +91,9 @@ export default function Settings() {
                 data-testid="badge-connection-status"
               >
                 {status.connected ? (
-                  <><CheckCircle className="h-3 w-3 mr-1" /> Connected</>
+                  <><CheckCircle className="h-3 w-3 mr-1" /> {t('settings.connected')}</>
                 ) : (
-                  <><XCircle className="h-3 w-3 mr-1" /> Not Connected</>
+                  <><XCircle className="h-3 w-3 mr-1" /> {t('settings.notConnected')}</>
                 )}
               </Badge>
             )}
@@ -96,9 +102,7 @@ export default function Settings() {
           <div className="space-y-4 mb-6">
             <div className="p-4 rounded-md bg-muted/30 border border-border">
               <p className="text-sm text-muted-foreground">
-                <strong>Note:</strong> Binance API integration allows you to fetch real-time market data and execute live trades.
-                You can test the connection without providing credentials to fetch public price data.
-                For trading operations, you'll need to provide your Binance API key and secret.
+                <strong>{t('settings.note')}:</strong> {t('settings.binanceNote')}
               </p>
             </div>
 
