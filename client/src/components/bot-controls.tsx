@@ -3,14 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Play, Square, Zap } from "lucide-react";
-import type { BotState, StrategyType, TradingMode } from "@shared/schema";
+import { Play, Square, Zap, Brain, TrendingUp, AlertCircle } from "lucide-react";
+import type { BotState, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
 interface BotControlsProps {
   botState: BotState;
   onStart: (strategy: StrategyType, mode: TradingMode) => void;
   onStop: () => void;
   onStrategyChange: (strategy: StrategyType) => void;
+  onAIToggle: (enabled: boolean) => void;
+  latestAIDecision: AIDecision | null;
   isLoading?: boolean;
 }
 
@@ -20,9 +22,10 @@ const strategies: { type: StrategyType; name: string; risk: string; profit: stri
   { type: 'aggressive', name: 'Aggressive', risk: '3-5%', profit: '7-10%' },
 ];
 
-export function BotControls({ botState, onStart, onStop, onStrategyChange, isLoading }: BotControlsProps) {
+export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIToggle, latestAIDecision, isLoading }: BotControlsProps) {
   const isRunning = botState.status === 'running';
   const mode = botState.mode;
+  const aiEnabled = botState.aiEnabled || false;
 
   const handleStrategyClick = (strategyType: StrategyType) => {
     if (isRunning) {
@@ -154,6 +157,89 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, isLoa
             />
           </div>
         </div>
+
+        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-md">
+          <div className="flex items-center gap-3">
+            <Brain className="h-5 w-5 text-primary" />
+            <div>
+              <Label htmlFor="ai-switch" className="text-sm font-medium cursor-pointer">
+                AI Strategy Selection
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {aiEnabled ? 'AI analyzing markets every 60s' : 'Manual strategy control'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={aiEnabled ? 'default' : 'secondary'} data-testid="badge-ai-status">
+              {aiEnabled ? 'Active' : 'Off'}
+            </Badge>
+            <Switch
+              id="ai-switch"
+              checked={aiEnabled}
+              onCheckedChange={onAIToggle}
+              disabled={isLoading}
+              data-testid="switch-ai-toggle"
+            />
+          </div>
+        </div>
+
+        {aiEnabled && latestAIDecision && (
+          <div className="p-4 bg-primary/5 rounded-md border border-primary/20">
+            <div className="flex items-start gap-3">
+              <TrendingUp className="h-5 w-5 text-primary mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Latest AI Analysis</Label>
+                  <Badge 
+                    variant={latestAIDecision.confidence >= 70 ? 'default' : 'secondary'}
+                    data-testid="badge-ai-confidence"
+                  >
+                    {latestAIDecision.confidence}% Confidence
+                  </Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Recommended Strategy:</span>
+                    <Badge variant="outline" className="text-xs" data-testid="text-ai-recommendation">
+                      {latestAIDecision.selectedStrategy.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-ai-reasoning">
+                    {latestAIDecision.reasoning}
+                  </p>
+                  {latestAIDecision.marketConditions && (
+                    <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-primary/10">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Volatility</p>
+                        <p className="text-xs font-medium tabular-nums">{latestAIDecision.marketConditions.volatility.toFixed(1)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Trend Strength</p>
+                        <p className="text-xs font-medium tabular-nums">{latestAIDecision.marketConditions.trendStrength.toFixed(1)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Momentum</p>
+                        <p className="text-xs font-medium tabular-nums">{latestAIDecision.marketConditions.momentum.toFixed(1)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {aiEnabled && !latestAIDecision && isRunning && (
+          <div className="p-4 bg-muted/30 rounded-md border border-border">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                AI is analyzing market conditions... First analysis in 60 seconds
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

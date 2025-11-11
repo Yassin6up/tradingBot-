@@ -8,10 +8,11 @@ import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Portfolio, BotState, Trade, ChartDataPoint, StrategyType, TradingMode } from "@shared/schema";
+import type { Portfolio, BotState, Trade, ChartDataPoint, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
 export default function Dashboard() {
   const [uptime, setUptime] = useState(0);
+  const [latestAIDecision, setLatestAIDecision] = useState<AIDecision | null>(null);
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
 
@@ -102,6 +103,49 @@ export default function Dashboard() {
     },
   });
 
+  // Toggle AI mutation
+  const toggleAIMutation = useMutation<BotState, Error, boolean, { previousBotState?: BotState }>({
+    mutationFn: async (enabled: boolean): Promise<BotState> => {
+      const response = await apiRequest('POST', '/api/ai/toggle', { enabled });
+      return await response.json();
+    },
+    onMutate: async (enabled) => {
+      // Cancel outgoing refetches to avoid race conditions
+      await queryClient.cancelQueries({ queryKey: ['/api/bot/status'] });
+      
+      // Snapshot previous value
+      const previousBotState = queryClient.getQueryData<BotState>(['/api/bot/status']);
+      
+      // Optimistically update to new value
+      queryClient.setQueryData<BotState>(['/api/bot/status'], (old) => 
+        old ? { ...old, aiEnabled: enabled } : old
+      );
+      
+      return { previousBotState };
+    },
+    onSuccess: (data) => {
+      // Update with server response
+      queryClient.setQueryData<BotState>(['/api/bot/status'], data);
+      toast({
+        title: data.aiEnabled ? "AI Enabled" : "AI Disabled",
+        description: data.aiEnabled 
+          ? "AI will now analyze market conditions and recommend strategies" 
+          : "Manual strategy selection active",
+      });
+    },
+    onError: (error, _enabled, context) => {
+      // Rollback on error
+      if (context?.previousBotState) {
+        queryClient.setQueryData(['/api/bot/status'], context.previousBotState);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle AI",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Subscribe to WebSocket events
   useEffect(() => {
     const unsubscribePrices = subscribe('price_update', () => {
@@ -121,11 +165,28 @@ export default function Dashboard() {
       });
     });
 
+    const unsubscribeAI = subscribe('ai_decision', (decision: AIDecision) => {
+      // Only update if AI is enabled
+      const currentBotState = queryClient.getQueryData<BotState>(['/api/bot/status']);
+      if (currentBotState?.aiEnabled) {
+        setLatestAIDecision(decision);
+        
+        // Show toast notification if strategy changed
+        if (botState?.strategy !== decision.selectedStrategy) {
+          toast({
+            title: "AI Strategy Recommendation",
+            description: `AI suggests switching to ${decision.selectedStrategy.toUpperCase()} strategy (${decision.confidence}% confidence)`,
+          });
+        }
+      }
+    });
+
     return () => {
       unsubscribePrices();
       unsubscribeTrades();
+      unsubscribeAI();
     };
-  }, [subscribe, toast]);
+  }, [subscribe, toast, botState?.strategy]);
 
   // Update uptime counter
   useEffect(() => {
@@ -155,6 +216,14 @@ export default function Dashboard() {
 
   const handleStrategyChange = (strategy: StrategyType) => {
     changeStrategyMutation.mutate(strategy);
+  };
+
+  const handleAIToggle = (enabled: boolean) => {
+    toggleAIMutation.mutate(enabled);
+    // Clear AI decision display when disabling AI
+    if (!enabled) {
+      setLatestAIDecision(null);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -240,7 +309,9 @@ export default function Dashboard() {
               onStart={handleStart}
               onStop={handleStop}
               onStrategyChange={handleStrategyChange}
-              isLoading={startBotMutation.isPending || stopBotMutation.isPending || changeStrategyMutation.isPending}
+              onAIToggle={handleAIToggle}
+              latestAIDecision={latestAIDecision}
+              isLoading={startBotMutation.isPending || stopBotMutation.isPending || changeStrategyMutation.isPending || toggleAIMutation.isPending}
             />
           )}
         </div>
