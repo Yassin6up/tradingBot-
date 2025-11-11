@@ -17,6 +17,39 @@
       "stopped": "Stopped"
     }
   },
+  "bot": {
+    "title": "Trading Bot",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped"
+    },
+    "actions": {
+      "start": "Start Bot",
+      "stop": "Stop Bot"
+    },
+    "strategyLabel": "Trading Strategy",
+    "strategies": {
+      "safe": "Safe",
+      "balanced": "Balanced",
+      "aggressive": "Aggressive"
+    },
+    "active": "Active",
+    "off": "Off",
+    "risk": "Risk",
+    "target": "Target",
+    "modeLabel": "Trading Mode",
+    "modes": {
+      "sandbox": "Sandbox",
+      "real": "Real",
+      "sandboxDesc": "Virtual money (safe)",
+      "realDesc": "Real money (live)"
+    },
+    "aiLabel": "AI Strategy Selection",
+    "aiDesc": {
+      "enabled": "AI analyzing markets every 60s",
+      "disabled": "Manual strategy control"
+    }
+  },
   "botControls": {
     "title": "Bot Controls",
     "startBot": "Start Bot",
@@ -82,19 +115,40 @@
     "securityNote": "Never share your API secret with anyone. Store it securely and only use it in trusted applications. Consider using the testnet/sandbox mode first to test the bot without risking real funds."
   },
   "trades": {
-    "title": "Recent Trades",
+    "title": "Trade History",
+    "trade": "trade",
+    "trades": "trades",
     "buy": "BUY",
     "sell": "SELL",
     "price": "Price",
     "quantity": "Quantity",
     "profit": "Profit",
     "time": "Time",
-    "noTrades": "No trades yet. Start the bot to begin trading."
+    "noTrades": "No trades yet",
+    "startBot": "Start the bot to begin trading",
+    "noMatches": "No trades match your filters",
+    "tryAdjusting": "Try adjusting your filter criteria",
+    "filters": {
+      "allSymbols": "All Symbols",
+      "allStrategies": "All Strategies",
+      "allTime": "All Time",
+      "24h": "Last 24 Hours",
+      "7d": "Last 7 Days",
+      "30d": "Last 30 Days",
+      "clear": "Clear"
+    }
   },
   "chart": {
     "title": "Price Chart",
     "price": "Price (USD)",
     "selectCoin": "Select Coin"
+  },
+  "coins": {
+    "btc": "Bitcoin",
+    "eth": "Ethereum",
+    "bnb": "Binance Coin",
+    "sol": "Solana",
+    "ada": "Cardano"
   },
   "common": {
     "loading": "Loading...",

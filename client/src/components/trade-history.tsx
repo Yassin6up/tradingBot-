@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTranslation } from "react-i18next";
 import { ArrowUpRight, ArrowDownRight, Filter, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Trade, StrategyType } from "@shared/schema";
@@ -16,6 +17,7 @@ interface TradeHistoryProps {
 type TimeFilter = 'all' | '24h' | '7d' | '30d';
 
 export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
+  const { t } = useTranslation();
   const [symbolFilter, setSymbolFilter] = useState<string>('all');
   const [strategyFilter, setStrategyFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
@@ -111,9 +113,9 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
   return (
     <Card className="p-6" data-testid="card-trade-history">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold" data-testid="text-trade-history-title">Trade History</h3>
+        <h3 className="text-xl font-semibold" data-testid="text-trade-history-title">{t('trades.title')}</h3>
         <Badge variant="secondary" data-testid="badge-trade-count">
-          {filteredTrades.length} {filteredTrades.length === 1 ? 'trade' : 'trades'}
+          {filteredTrades.length} {filteredTrades.length === 1 ? t('trades.trade') : t('trades.trades')}
         </Badge>
       </div>
 
@@ -125,10 +127,10 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
           {/* Symbol Filter */}
           <Select value={symbolFilter} onValueChange={setSymbolFilter}>
             <SelectTrigger className="w-[140px]" data-testid="select-symbol-filter">
-              <SelectValue placeholder="All Symbols" />
+              <SelectValue placeholder={t('trades.filters.allSymbols')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Symbols</SelectItem>
+              <SelectItem value="all">{t('trades.filters.allSymbols')}</SelectItem>
               {uniqueSymbols.map(symbol => (
                 <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
               ))}
@@ -138,26 +140,26 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
           {/* Strategy Filter */}
           <Select value={strategyFilter} onValueChange={setStrategyFilter}>
             <SelectTrigger className="w-[140px]" data-testid="select-strategy-filter">
-              <SelectValue placeholder="All Strategies" />
+              <SelectValue placeholder={t('trades.filters.allStrategies')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Strategies</SelectItem>
-              <SelectItem value="safe">Safe</SelectItem>
-              <SelectItem value="balanced">Balanced</SelectItem>
-              <SelectItem value="aggressive">Aggressive</SelectItem>
+              <SelectItem value="all">{t('trades.filters.allStrategies')}</SelectItem>
+              <SelectItem value="safe">{t('bot.strategies.safe')}</SelectItem>
+              <SelectItem value="balanced">{t('bot.strategies.balanced')}</SelectItem>
+              <SelectItem value="aggressive">{t('bot.strategies.aggressive')}</SelectItem>
             </SelectContent>
           </Select>
 
           {/* Time Filter */}
           <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
             <SelectTrigger className="w-[140px]" data-testid="select-time-filter">
-              <SelectValue placeholder="All Time" />
+              <SelectValue placeholder={t('trades.filters.allTime')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="24h">Last 24 Hours</SelectItem>
-              <SelectItem value="7d">Last 7 Days</SelectItem>
-              <SelectItem value="30d">Last 30 Days</SelectItem>
+              <SelectItem value="all">{t('trades.filters.allTime')}</SelectItem>
+              <SelectItem value="24h">{t('trades.filters.24h')}</SelectItem>
+              <SelectItem value="7d">{t('trades.filters.7d')}</SelectItem>
+              <SelectItem value="30d">{t('trades.filters.30d')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -170,7 +172,7 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
               data-testid="button-clear-filters"
             >
               <X className="h-4 w-4 mr-1" />
-              Clear
+              {t('trades.filters.clear')}
             </Button>
           )}
         </div>
@@ -196,10 +198,10 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
       {filteredTrades.length === 0 ? (
         <div className="text-center py-12" data-testid="empty-state-trades">
           <p className="text-muted-foreground text-sm">
-            {hasActiveFilters ? 'No trades match your filters' : 'No trades yet'}
+            {hasActiveFilters ? t('trades.noMatches') : t('trades.noTrades')}
           </p>
           <p className="text-muted-foreground text-xs mt-1">
-            {hasActiveFilters ? 'Try adjusting your filter criteria' : 'Start the bot to begin trading'}
+            {hasActiveFilters ? t('trades.tryAdjusting') : t('trades.startBot')}
           </p>
         </div>
       ) : (

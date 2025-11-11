@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "react-i18next";
 import { Play, Square, Zap, Brain, TrendingUp, AlertCircle } from "lucide-react";
 import type { BotState, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
@@ -16,13 +17,14 @@ interface BotControlsProps {
   isLoading?: boolean;
 }
 
-const strategies: { type: StrategyType; name: string; risk: string; profit: string }[] = [
-  { type: 'safe', name: 'Safe', risk: '1-2%', profit: '3-4%' },
-  { type: 'balanced', name: 'Balanced', risk: '2-3%', profit: '5-6%' },
-  { type: 'aggressive', name: 'Aggressive', risk: '3-5%', profit: '7-10%' },
-];
-
 export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIToggle, latestAIDecision, isLoading }: BotControlsProps) {
+  const { t } = useTranslation();
+  
+  const strategies: { type: StrategyType; name: string; risk: string; profit: string }[] = [
+    { type: 'safe', name: t('bot.strategies.safe'), risk: '1-2%', profit: '3-4%' },
+    { type: 'balanced', name: t('bot.strategies.balanced'), risk: '2-3%', profit: '5-6%' },
+    { type: 'aggressive', name: t('bot.strategies.aggressive'), risk: '3-5%', profit: '7-10%' },
+  ];
   const isRunning = botState.status === 'running';
   const mode = botState.mode;
   const aiEnabled = botState.aiEnabled || false;
@@ -53,13 +55,13 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-semibold mb-1" data-testid="text-bot-title">Trading Bot</h3>
+            <h3 className="text-xl font-semibold mb-1" data-testid="text-bot-title">{t('bot.title')}</h3>
             <div className="flex items-center gap-2">
               <div className={`h-2 w-2 rounded-full ${
                 isRunning ? 'bg-profit animate-pulse' : 'bg-muted-foreground'
               }`} data-testid="indicator-bot-status"></div>
               <span className="text-sm text-muted-foreground" data-testid="text-bot-status">
-                {isRunning ? 'Running' : 'Stopped'}
+                {isRunning ? t('bot.status.running') : t('bot.status.stopped')}
               </span>
               {isRunning && (
                 <>
@@ -81,19 +83,19 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
             {isRunning ? (
               <>
                 <Square className="h-4 w-4 mr-2" />
-                Stop Bot
+                {t('bot.actions.stop')}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4 mr-2" />
-                Start Bot
+                {t('bot.actions.start')}
               </>
             )}
           </Button>
         </div>
 
         <div className="space-y-3">
-          <Label className="text-sm font-medium">Trading Strategy</Label>
+          <Label className="text-sm font-medium">{t('bot.strategyLabel')}</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {strategies.map((strategy) => {
               const isSelected = botState.strategy === strategy.type;
@@ -113,17 +115,17 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
                     <span className="font-semibold">{strategy.name}</span>
                     {isSelected && (
                       <Badge variant="default" className="text-xs" data-testid={`badge-strategy-selected-${strategy.type}`}>
-                        Active
+                        {t('bot.active')}
                       </Badge>
                     )}
                   </div>
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
-                      <span>Risk:</span>
+                      <span>{t('bot.risk')}:</span>
                       <span className="font-medium">{strategy.risk}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Target:</span>
+                      <span>{t('bot.target')}:</span>
                       <span className="font-medium text-profit">{strategy.profit}</span>
                     </div>
                   </div>
@@ -138,16 +140,16 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
             <Zap className="h-5 w-5 text-warning" />
             <div>
               <Label htmlFor="mode-switch" className="text-sm font-medium cursor-pointer">
-                Trading Mode
+                {t('bot.modeLabel')}
               </Label>
               <p className="text-xs text-muted-foreground">
-                {mode === 'sandbox' ? 'Virtual money (safe)' : 'Real money (live)'}
+                {mode === 'sandbox' ? t('bot.modes.sandboxDesc') : t('bot.modes.realDesc')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={mode === 'sandbox' ? 'secondary' : 'destructive'} data-testid="badge-trading-mode">
-              {mode === 'sandbox' ? 'Sandbox' : 'Real'}
+              {mode === 'sandbox' ? t('bot.modes.sandbox') : t('bot.modes.real')}
             </Badge>
             <Switch
               id="mode-switch"
@@ -163,16 +165,16 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
             <Brain className="h-5 w-5 text-primary" />
             <div>
               <Label htmlFor="ai-switch" className="text-sm font-medium cursor-pointer">
-                AI Strategy Selection
+                {t('bot.aiLabel')}
               </Label>
               <p className="text-xs text-muted-foreground">
-                {aiEnabled ? 'AI analyzing markets every 60s' : 'Manual strategy control'}
+                {aiEnabled ? t('bot.aiDesc.enabled') : t('bot.aiDesc.disabled')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={aiEnabled ? 'default' : 'secondary'} data-testid="badge-ai-status">
-              {aiEnabled ? 'Active' : 'Off'}
+              {aiEnabled ? t('bot.active') : t('bot.off')}
             </Badge>
             <Switch
               id="ai-switch"

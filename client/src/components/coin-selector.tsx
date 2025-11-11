@@ -8,11 +8,11 @@ import {
 } from "@/components/ui/select";
 
 const COINS = [
-  { symbol: 'BTC/USDT', name: 'Bitcoin', icon: '₿' },
-  { symbol: 'ETH/USDT', name: 'Ethereum', icon: 'Ξ' },
-  { symbol: 'BNB/USDT', name: 'Binance Coin', icon: 'BNB' },
-  { symbol: 'SOL/USDT', name: 'Solana', icon: 'SOL' },
-  { symbol: 'ADA/USDT', name: 'Cardano', icon: 'ADA' },
+  { symbol: 'BTC/USDT', nameKey: 'coins.btc', icon: '₿' },
+  { symbol: 'ETH/USDT', nameKey: 'coins.eth', icon: 'Ξ' },
+  { symbol: 'BNB/USDT', nameKey: 'coins.bnb', icon: 'BNB' },
+  { symbol: 'SOL/USDT', nameKey: 'coins.sol', icon: 'SOL' },
+  { symbol: 'ADA/USDT', nameKey: 'coins.ada', icon: 'ADA' },
 ];
 
 interface CoinSelectorProps {
@@ -40,7 +40,7 @@ export function CoinSelector({ value, onValueChange }: CoinSelectorProps) {
           >
             <div className="flex items-center gap-2">
               <span className="font-mono font-bold">{coin.icon}</span>
-              <span>{coin.name}</span>
+              <span>{t(coin.nameKey)}</span>
               <span className="text-muted-foreground text-xs">{coin.symbol}</span>
             </div>
           </SelectItem>
