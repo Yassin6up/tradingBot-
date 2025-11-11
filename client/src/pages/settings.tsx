@@ -52,7 +52,7 @@ export default function Settings() {
     onError: (error) => {
       toast({
         title: t('common.error'),
-        description: error instanceof Error ? error.message : t('settings.testConnectionFailed'),
+        description: error instanceof Error ? error.message : t('common.testConnectionFailed'),
         variant: "destructive",
       });
     },
@@ -108,11 +108,11 @@ export default function Settings() {
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="api-key">API Key (Optional)</Label>
+                <Label htmlFor="api-key">{t('settings.apiKey')}</Label>
                 <Input
                   id="api-key"
                   type="password"
-                  placeholder="Enter your Binance API key"
+                  placeholder={t('settings.apiKey')}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   className="mt-1"
@@ -121,11 +121,11 @@ export default function Settings() {
               </div>
 
               <div>
-                <Label htmlFor="api-secret">API Secret (Optional)</Label>
+                <Label htmlFor="api-secret">{t('settings.apiSecret')}</Label>
                 <Input
                   id="api-secret"
                   type="password"
-                  placeholder="Enter your Binance API secret"
+                  placeholder={t('settings.apiSecret')}
                   value={secret}
                   onChange={(e) => setSecret(e.target.value)}
                   className="mt-1"
@@ -143,7 +143,7 @@ export default function Settings() {
                   data-testid="checkbox-testnet"
                 />
                 <Label htmlFor="testnet" className="cursor-pointer">
-                  Use Testnet (Sandbox Mode)
+                  {t('settings.testnet')}
                 </Label>
               </div>
             </div>
@@ -158,12 +158,12 @@ export default function Settings() {
             {testMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Testing Connection...
+                {t('settings.testing')}
               </>
             ) : (
               <>
                 <Plug className="mr-2 h-4 w-4" />
-                Test Connection
+                {t('settings.testConnection')}
               </>
             )}
           </Button>
@@ -171,24 +171,23 @@ export default function Settings() {
 
         {/* Information Card */}
         <Card className="p-6" data-testid="card-api-info">
-          <h3 className="font-semibold mb-3">How to Get Binance API Credentials</h3>
+          <h3 className="font-semibold mb-3">{t('settings.howTo')}</h3>
           <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-            <li>Log in to your Binance account</li>
-            <li>Go to Account → API Management</li>
-            <li>Create a new API key with appropriate permissions</li>
-            <li>Copy the API Key and Secret Key</li>
-            <li>Paste them in the fields above</li>
-            <li>For safety, enable "Restrict access to trusted IPs only"</li>
-            <li>Enable only "Enable Reading" for monitoring, or "Enable Spot & Margin Trading" for automated trading</li>
+            <li>{t('settings.step1')}</li>
+            <li>{t('settings.step2')}</li>
+            <li>{t('settings.step3')}</li>
+            <li>{t('settings.step4')}</li>
+            <li>{t('settings.step5')}</li>
+            <li>{t('settings.step6')}</li>
+            <li>{t('settings.step7')}</li>
           </ol>
 
           <div className="mt-4 p-4 rounded-md bg-yellow-500/10 border border-yellow-500/20">
             <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
-              ⚠️ Security Warning
+              ⚠️ {t('settings.securityWarning')}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Never share your API secret with anyone. Store it securely and only use it in trusted applications.
-              Consider using the testnet/sandbox mode first to test the bot without risking real funds.
+              {t('settings.securityNote')}
             </p>
           </div>
         </Card>
