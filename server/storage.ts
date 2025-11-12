@@ -13,6 +13,13 @@ export interface TradeFilters {
   endDate?: number;   // timestamp (alternative to timeRange)
 }
 
+export interface TradingModeSettings {
+  mode: TradingMode;
+  confirmedAt?: Date;
+  maxPositionSize: number;
+  dailyLossLimit: number;
+}
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -27,6 +34,12 @@ export interface IStorage {
   getBotState(): Promise<BotState>;
   updateBotState(state: Partial<BotState>): Promise<BotState>;
   clearTrades(): Promise<void>;
+  
+  // Trading mode methods
+  getTradingMode(): Promise<TradingModeSettings>;
+  setTradingMode(settings: TradingModeSettings): Promise<void>;
+  getRealBalance(): Promise<number>;
+  updateRealBalance(balance: number): Promise<void>;
   
   // AI Decision methods
   addAIDecision(decision: AIDecision): Promise<void>;
@@ -43,7 +56,7 @@ export class DatabaseStorage implements IStorage {
     this.botState = {
       status: 'stopped',
       strategy: 'balanced',
-      mode: 'sandbox',
+      mode: 'paper',
       startTime: null,
       uptime: 0,
       aiEnabled: false,
@@ -246,6 +259,84 @@ export class DatabaseStorage implements IStorage {
 
   async getLatestAIDecision(): Promise<AIDecision | undefined> {
     return this.aiDecisions[this.aiDecisions.length - 1];
+  }
+
+  // Trading mode methods
+  async getTradingMode(): Promise<TradingModeSettings> {
+    const [settings] = await db.select().from(portfolioSettings).limit(1);
+    
+    if (!settings) {
+      // Return default paper trading mode if no settings exist
+      return {
+        mode: 'paper',
+        maxPositionSize: 1000,
+        dailyLossLimit: 500,
+      };
+    }
+    
+    return {
+      mode: settings.tradingMode as TradingMode,
+      confirmedAt: settings.realModeConfirmedAt || undefined,
+      maxPositionSize: parseFloat(settings.maxPositionSize || '1000'),
+      dailyLossLimit: parseFloat(settings.dailyLossLimit || '500'),
+    };
+  }
+
+  async setTradingMode(modeSettings: TradingModeSettings): Promise<void> {
+    // CRITICAL SAFETY CHECK: Switching to real mode requires explicit confirmation
+    if (modeSettings.mode === 'real' && !modeSettings.confirmedAt) {
+      throw new Error('Real trading mode requires explicit confirmation timestamp. This is a safety feature to prevent accidental real money trading.');
+    }
+    
+    // Ensure portfolio settings row exists
+    const [existingSettings] = await db.select().from(portfolioSettings).limit(1);
+    if (!existingSettings) {
+      throw new Error('Portfolio settings not initialized. Cannot change trading mode.');
+    }
+    
+    // Update trading mode in portfolio settings
+    const updateData: any = {
+      tradingMode: modeSettings.mode,
+      maxPositionSize: modeSettings.maxPositionSize.toString(),
+      dailyLossLimit: modeSettings.dailyLossLimit.toString(),
+    };
+    
+    // If switching to real mode, record confirmation timestamp
+    if (modeSettings.mode === 'real') {
+      updateData.realModeConfirmedAt = modeSettings.confirmedAt;
+      updateData.realModeEnabledBy = 'system'; // TODO: Use actual user ID when auth is implemented
+    }
+    
+    const result = await db.update(portfolioSettings)
+      .set(updateData)
+      .where(eq(portfolioSettings.id, existingSettings.id));
+    
+    // Verify update succeeded
+    if (!result.changes || result.changes === 0) {
+      throw new Error('Failed to update trading mode in database');
+    }
+    
+    // Also update bot state to match
+    this.botState.mode = modeSettings.mode;
+  }
+
+  async getRealBalance(): Promise<number> {
+    const [settings] = await db.select().from(portfolioSettings).limit(1);
+    
+    if (!settings || !settings.realBalance) {
+      return 0;
+    }
+    
+    return parseFloat(settings.realBalance);
+  }
+
+  async updateRealBalance(balance: number): Promise<void> {
+    await db.update(portfolioSettings)
+      .set({
+        realBalance: balance.toString(),
+        realBalanceUpdatedAt: new Date(),
+      })
+      .where(eq(portfolioSettings.id, 1));
   }
 }
 

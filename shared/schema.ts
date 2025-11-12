@@ -40,6 +40,16 @@ export const portfolioSettings = sqliteTable("portfolio_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   initialBalance: text("initial_balance").notNull().default('10000'), // Store as string
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  // Trading mode settings
+  tradingMode: text("trading_mode").notNull().default('paper'), // 'paper' or 'real'
+  realBalance: text("real_balance").default('0'), // Fetched from Binance, stored as string
+  realBalanceUpdatedAt: integer("real_balance_updated_at", { mode: 'timestamp' }),
+  // Safety confirmations
+  realModeConfirmedAt: integer("real_mode_confirmed_at", { mode: 'timestamp' }),
+  realModeEnabledBy: text("real_mode_enabled_by"), // User identifier who enabled real mode
+  // Position limits for real trading
+  maxPositionSize: text("max_position_size").default('1000'), // Maximum position size in USD
+  dailyLossLimit: text("daily_loss_limit").default('500'), // Maximum daily loss in USD
 });
 
 export const insertPortfolioSettingsSchema = createInsertSchema(portfolioSettings).omit({ id: true, createdAt: true });
@@ -48,7 +58,7 @@ export type PortfolioSettingsRow = typeof portfolioSettings.$inferSelect;
 
 // Trading Types (in-memory, not database tables)
 
-export type TradingMode = 'sandbox' | 'real';
+export type TradingMode = 'paper' | 'real';
 export type TradeType = 'BUY' | 'SELL';
 export type BotStatus = 'stopped' | 'running' | 'paused';
 export type StrategyType = 'safe' | 'balanced' | 'aggressive';
@@ -148,7 +158,14 @@ export interface ChartDataPoint {
 // Zod schemas for validation
 export const startBotSchema = z.object({
   strategy: z.enum(['safe', 'balanced', 'aggressive']),
-  mode: z.enum(['sandbox', 'real']).default('sandbox'),
+  mode: z.enum(['paper', 'real']).default('paper'),
+});
+
+export const changeTradingModeSchema = z.object({
+  mode: z.enum(['paper', 'real']),
+  confirmation: z.boolean().default(false), // Must be true for real mode
+  maxPositionSize: z.string().optional(),
+  dailyLossLimit: z.string().optional(),
 });
 
 export const changeStrategySchema = z.object({
