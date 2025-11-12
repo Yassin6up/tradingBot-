@@ -89,6 +89,23 @@ function initializeTables() {
     );
   `);
   
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS positions (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL,
+      entry_price TEXT NOT NULL,
+      quantity TEXT NOT NULL,
+      stop_loss TEXT NOT NULL,
+      take_profit TEXT NOT NULL,
+      trailing_stop TEXT,
+      mode TEXT NOT NULL,
+      strategy TEXT NOT NULL,
+      opened_at INTEGER NOT NULL,
+      closed_at INTEGER
+    );
+  `);
+  
   // Migrate legacy 'sandbox' mode to 'paper' mode in existing trades
   try {
     sqlite.exec(`UPDATE trades SET mode = 'paper' WHERE mode = 'sandbox'`);

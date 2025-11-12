@@ -1,4 +1,4 @@
-import type { Trade, StrategyType, TradingMode, PriceData, ChartDataPoint, AIDecision } from "@shared/schema";
+import type { Trade, StrategyType, TradingMode, PriceData, ChartDataPoint, AIDecision, Position } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { strategyAI } from "./services/strategy-ai";
@@ -150,6 +150,7 @@ class TradingEngine {
     // Update prices every 2 seconds
     this.intervalId = setInterval(() => {
       this.updatePrices();
+      this.monitorPositions(); // Check stop-loss/take-profit
       this.maybeExecuteTrade();
     }, 2000);
 
@@ -304,6 +305,99 @@ class TradingEngine {
 
     // Broadcast price updates
     this.broadcast('price_update', updates);
+  }
+
+  /**
+   * Monitor open positions for stop-loss and take-profit triggers
+   */
+  private async monitorPositions() {
+    try {
+      // Get all open positions (both paper and real)
+      const openPositions = await storage.getOpenPositions();
+      
+      if (openPositions.length === 0) {
+        return; // No positions to monitor
+      }
+
+      for (const position of openPositions) {
+        const currentPrice = this.priceData.get(position.symbol);
+        
+        if (!currentPrice) {
+          continue; // Price data not available for this symbol
+        }
+
+        let shouldClose = false;
+        let closeReason = '';
+        let profitLoss = 0;
+
+        // Check STOP-LOSS (protect against losses)
+        if (position.side === 'LONG' && currentPrice <= position.stopLoss) {
+          shouldClose = true;
+          closeReason = 'STOP-LOSS';
+          profitLoss = (currentPrice - position.entryPrice) * position.quantity;
+          console.log(`🛑 STOP-LOSS triggered for ${position.symbol}`);
+          console.log(`   Entry: $${position.entryPrice.toFixed(2)} | Current: $${currentPrice.toFixed(2)}`);
+          console.log(`   Loss: $${profitLoss.toFixed(2)}`);
+        }
+
+        // Check TAKE-PROFIT (lock in gains)
+        if (position.side === 'LONG' && currentPrice >= position.takeProfit) {
+          shouldClose = true;
+          closeReason = 'TAKE-PROFIT';
+          profitLoss = (currentPrice - position.entryPrice) * position.quantity;
+          console.log(`✅ TAKE-PROFIT triggered for ${position.symbol}`);
+          console.log(`   Entry: $${position.entryPrice.toFixed(2)} | Current: $${currentPrice.toFixed(2)}`);
+          console.log(`   Profit: $${profitLoss.toFixed(2)}`);
+        }
+
+        if (shouldClose) {
+          await this.closePosition(position, currentPrice, closeReason, profitLoss);
+        }
+      }
+    } catch (error) {
+      console.error('Error monitoring positions:', error);
+    }
+  }
+
+  /**
+   * Close a position and record the trade
+   */
+  private async closePosition(position: Position, exitPrice: number, reason: string, profitLoss: number) {
+    try {
+      // Close the position in database
+      await storage.closePosition(position.id, Date.now());
+
+      // Update portfolio balance
+      const portfolio = await storage.getPortfolio();
+      await storage.updatePortfolio({
+        balance: portfolio.balance + profitLoss,
+      });
+
+      // Record the closing trade
+      const profitPercent = (profitLoss / (position.entryPrice * position.quantity)) * 100;
+      
+      const trade: Trade = {
+        id: randomUUID(),
+        symbol: position.symbol,
+        type: 'SELL', // Closing position
+        price: exitPrice,
+        quantity: position.quantity,
+        timestamp: Date.now(),
+        profit: profitLoss,
+        profitPercent,
+        strategy: position.strategy,
+        mode: position.mode,
+      };
+
+      await storage.addTrade(trade);
+      this.broadcast('trade_executed', trade);
+
+      console.log(`💼 Position CLOSED (${reason}): ${position.symbol}`);
+      console.log(`   P/L: $${profitLoss.toFixed(2)} (${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%)`);
+      console.log(`   Mode: ${position.mode.toUpperCase()}`);
+    } catch (error) {
+      console.error(`Failed to close position ${position.id}:`, error);
+    }
   }
 
   private async maybeExecuteTrade() {
@@ -471,24 +565,68 @@ class TradingEngine {
         console.log(`   Total received: $${(quantity * (order.average || currentPrice)).toFixed(2)}`);
       }
 
-      // Record the trade (profit will be calculated later when position closes)
-      const trade: Trade = {
-        id: randomUUID(),
-        symbol,
-        type,
-        price: order.average || currentPrice,
-        quantity,
-        timestamp: Date.now(),
-        profit: 0, // Real trades track profit separately
-        profitPercent: 0,
-        strategy: this.currentStrategy,
-        mode: 'real',
-      };
+      const entryPrice = order.average || currentPrice;
 
-      await storage.addTrade(trade);
-      this.broadcast('trade_executed', trade);
+      if (type === 'BUY') {
+        // BUY = Open a LONG position with stop-loss and take-profit
+        const stopLossPrice = entryPrice * (1 - config.riskPerTrade); // Stop loss at risk percentage
+        const takeProfitPrice = entryPrice * (1 + config.profitTarget); // Take profit at target percentage
 
-      console.log(`\n✅ 💰 REAL ${type} COMPLETED: ${quantity.toFixed(8)} ${symbol} at $${(order.average || currentPrice).toFixed(2)}`);
+        const position: Position = {
+          id: randomUUID(),
+          symbol,
+          side: 'LONG',
+          entryPrice,
+          quantity,
+          stopLoss: stopLossPrice,
+          takeProfit: takeProfitPrice,
+          mode: 'real',
+          strategy: this.currentStrategy,
+          openedAt: Date.now(),
+        };
+
+        await storage.addPosition(position);
+        console.log(`📍 POSITION OPENED: ${symbol} LONG`);
+        console.log(`   Entry: $${entryPrice.toFixed(2)}`);
+        console.log(`   Stop-Loss: $${stopLossPrice.toFixed(2)} (${(config.riskPerTrade * 100).toFixed(1)}% protection)`);
+        console.log(`   Take-Profit: $${takeProfitPrice.toFixed(2)} (${(config.profitTarget * 100).toFixed(1)}% target)`);
+        
+        // Also record the opening trade
+        const trade: Trade = {
+          id: randomUUID(),
+          symbol,
+          type: 'BUY',
+          price: entryPrice,
+          quantity,
+          timestamp: Date.now(),
+          profit: 0, // Profit calculated when position closes
+          profitPercent: 0,
+          strategy: this.currentStrategy,
+          mode: 'real',
+        };
+        
+        await storage.addTrade(trade);
+        this.broadcast('trade_executed', trade);
+      } else {
+        // SELL without an open position = just a standalone trade
+        const trade: Trade = {
+          id: randomUUID(),
+          symbol,
+          type: 'SELL',
+          price: entryPrice,
+          quantity,
+          timestamp: Date.now(),
+          profit: 0,
+          profitPercent: 0,
+          strategy: this.currentStrategy,
+          mode: 'real',
+        };
+        
+        await storage.addTrade(trade);
+        this.broadcast('trade_executed', trade);
+      }
+
+      console.log(`\n✅ 💰 REAL ${type} COMPLETED: ${quantity.toFixed(8)} ${symbol} at $${entryPrice.toFixed(2)}`);
       console.log('==================== TRADE SUCCESS ====================\n');
     } catch (error) {
       console.error('\n❌ ==================== TRADE FAILED ====================');
@@ -539,34 +677,65 @@ class TradingEngine {
     const tradeAmount = Math.min(positionSize, portfolio.balance * config.riskPerTrade);
     const quantity = tradeAmount / currentPrice;
 
-    // Simulate profit/loss (70% win rate for safe, 60% for balanced, 50% for aggressive)
-    const winRate = this.currentStrategy === 'safe' ? 0.7 : 
-                    this.currentStrategy === 'balanced' ? 0.6 : 0.5;
-    
-    const isWin = Math.random() < winRate;
-    const profitPercent = isWin 
-      ? config.minProfit + Math.random() * (config.maxProfit - config.minProfit)
-      : -(config.minProfit + Math.random() * (config.riskPerTrade - config.minProfit));
-    
-    const profit = tradeAmount * profitPercent;
+    if (type === 'BUY') {
+      // BUY = Open a LONG position with stop-loss and take-profit
+      const stopLossPrice = currentPrice * (1 - config.riskPerTrade); // Stop loss at risk percentage
+      const takeProfitPrice = currentPrice * (1 + config.profitTarget); // Take profit at target percentage
 
-    const trade: Trade = {
-      id: randomUUID(),
-      symbol,
-      type,
-      price: currentPrice,
-      quantity,
-      timestamp: Date.now(),
-      profit,
-      profitPercent: profitPercent * 100,
-      strategy: this.currentStrategy,
-      mode: 'paper',
-    };
+      const position: Position = {
+        id: randomUUID(),
+        symbol,
+        side: 'LONG',
+        entryPrice: currentPrice,
+        quantity,
+        stopLoss: stopLossPrice,
+        takeProfit: takeProfitPrice,
+        mode: 'paper',
+        strategy: this.currentStrategy,
+        openedAt: Date.now(),
+      };
 
-    await storage.addTrade(trade);
-    this.broadcast('trade_executed', trade);
+      await storage.addPosition(position);
+      console.log(`📝 PAPER POSITION OPENED: ${symbol} LONG`);
+      console.log(`   Entry: $${currentPrice.toFixed(2)} | Qty: ${quantity.toFixed(6)}`);
+      console.log(`   Stop-Loss: $${stopLossPrice.toFixed(2)} | Take-Profit: $${takeProfitPrice.toFixed(2)}`);
+      
+      // Also record the opening trade
+      const trade: Trade = {
+        id: randomUUID(),
+        symbol,
+        type: 'BUY',
+        price: currentPrice,
+        quantity,
+        timestamp: Date.now(),
+        profit: 0, // Profit calculated when position closes
+        profitPercent: 0,
+        strategy: this.currentStrategy,
+        mode: 'paper',
+      };
 
-    console.log(`📝 PAPER ${type}: ${quantity.toFixed(6)} ${symbol} at $${currentPrice.toFixed(2)} - P/L: $${profit.toFixed(2)}`);
+      await storage.addTrade(trade);
+      this.broadcast('trade_executed', trade);
+    } else {
+      // SELL without an open position = just a standalone trade
+      const trade: Trade = {
+        id: randomUUID(),
+        symbol,
+        type: 'SELL',
+        price: currentPrice,
+        quantity,
+        timestamp: Date.now(),
+        profit: 0,
+        profitPercent: 0,
+        strategy: this.currentStrategy,
+        mode: 'paper',
+      };
+
+      await storage.addTrade(trade);
+      this.broadcast('trade_executed', trade);
+      
+      console.log(`📝 PAPER ${type}: ${quantity.toFixed(6)} ${symbol} at $${currentPrice.toFixed(2)}`);
+    }
   }
 
   public getChartHistory(): ChartDataPoint[] {
