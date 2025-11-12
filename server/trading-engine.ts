@@ -376,48 +376,99 @@ class TradingEngine {
     config: StrategyConfig,
     riskMetrics: RiskMetrics
   ) {
+    console.log('\n==================== REAL TRADE ATTEMPT ====================');
+    console.log(`🎯 Attempting ${type} for ${symbol}`);
+    console.log(`📊 Strategy: ${this.currentStrategy} | Risk per trade: ${(config.riskPerTrade * 100).toFixed(1)}%`);
+    
     try {
       const { getBinanceService } = await import("./services/binance");
       const binanceService = getBinanceService();
 
+      console.log('🔌 Checking Binance connection...');
       if (!binanceService.isApiConnected()) {
-        console.error('❌ Cannot execute real trade: Binance not connected');
+        console.error('❌ TRADE BLOCKED: Binance API is not connected');
+        console.error('   → Check your API credentials in Settings');
+        console.error('   → Verify Binance API is accessible from this server location');
         return;
       }
+      console.log('✅ Binance API is connected');
 
       // Get real balance in USDT
+      console.log('💰 Fetching real Binance balance...');
       const realBalance = await binanceService.getTotalBalanceUSDT();
+      console.log(`   Balance: $${realBalance.toFixed(2)} USDT`);
+      
+      console.log(`📈 Fetching current price for ${symbol}...`);
       const currentPrice = await binanceService.fetchPrice(symbol);
+      console.log(`   Price: $${currentPrice.toFixed(2)}`);
       
       // Calculate position size based on real balance
       const positionSize = riskMetrics.recommendedPositionSize;
       const tradeAmount = Math.min(positionSize, realBalance * config.riskPerTrade);
+      
+      console.log('🧮 Trade calculation:');
+      console.log(`   Recommended position size: $${positionSize.toFixed(2)}`);
+      console.log(`   Max risk amount (${(config.riskPerTrade * 100).toFixed(1)}% of balance): $${(realBalance * config.riskPerTrade).toFixed(2)}`);
+      console.log(`   Final trade amount: $${tradeAmount.toFixed(2)}`);
 
       // Safety check: minimum trade amount
       if (tradeAmount < 10) {
-        console.warn(`⚠️ Real trade amount too small: $${tradeAmount.toFixed(2)} (minimum $10)`);
+        console.warn(`⚠️ TRADE SKIPPED: Trade amount too small`);
+        console.warn(`   Trade amount: $${tradeAmount.toFixed(2)}`);
+        console.warn(`   Minimum required: $10.00`);
+        console.warn(`   → Increase your balance or adjust risk settings`);
         return;
       }
+      console.log('✅ Trade amount meets minimum requirement ($10)');
 
       let order: any;
       let quantity: number;
 
       if (type === 'BUY') {
-        // Execute BUY order
+        console.log(`\n🛒 Executing BUY order...`);
+        console.log(`   Symbol: ${symbol}`);
+        console.log(`   Amount: $${tradeAmount.toFixed(2)} USDT`);
+        console.log(`   Expected quantity: ${(tradeAmount / currentPrice).toFixed(8)}`);
+        
         order = await binanceService.placeBuyOrder(symbol, tradeAmount);
         quantity = order.filled || (tradeAmount / currentPrice);
+        
+        console.log('✅ BUY order executed successfully');
+        console.log(`   Order ID: ${order.id || 'N/A'}`);
+        console.log(`   Filled quantity: ${quantity.toFixed(8)}`);
+        console.log(`   Average price: $${(order.average || currentPrice).toFixed(2)}`);
+        console.log(`   Total cost: $${(quantity * (order.average || currentPrice)).toFixed(2)}`);
       } else {
         // Execute SELL order - need to have the asset first
         const asset = symbol.split('/')[0]; // Extract base asset (e.g., 'BTC' from 'BTC/USDT')
+        
+        console.log(`\n💼 Checking ${asset} balance for SELL order...`);
         const assetBalance = await binanceService.getAssetBalance(asset);
+        console.log(`   ${asset} balance: ${assetBalance.toFixed(8)}`);
         
         if (assetBalance === 0) {
-          console.warn(`⚠️ Cannot SELL ${asset}: No balance available`);
+          console.warn(`⚠️ TRADE SKIPPED: No ${asset} balance available to sell`);
+          console.warn(`   → You need to BUY ${asset} first before you can SELL it`);
+          console.warn(`   → Or manually deposit ${asset} to your Binance account`);
           return;
         }
+        
+        const maxSellQuantity = Math.min(assetBalance, tradeAmount / currentPrice);
+        console.log(`   Max sellable quantity: ${maxSellQuantity.toFixed(8)}`);
+        console.log(`   Value at current price: $${(maxSellQuantity * currentPrice).toFixed(2)}`);
 
-        quantity = Math.min(assetBalance, tradeAmount / currentPrice);
+        console.log(`\n📤 Executing SELL order...`);
+        console.log(`   Symbol: ${symbol}`);
+        console.log(`   Quantity: ${maxSellQuantity.toFixed(8)} ${asset}`);
+        
+        quantity = maxSellQuantity;
         order = await binanceService.placeSellOrder(symbol, quantity);
+        
+        console.log('✅ SELL order executed successfully');
+        console.log(`   Order ID: ${order.id || 'N/A'}`);
+        console.log(`   Sold quantity: ${quantity.toFixed(8)}`);
+        console.log(`   Average price: $${(order.average || currentPrice).toFixed(2)}`);
+        console.log(`   Total received: $${(quantity * (order.average || currentPrice)).toFixed(2)}`);
       }
 
       // Record the trade (profit will be calculated later when position closes)
@@ -437,9 +488,30 @@ class TradingEngine {
       await storage.addTrade(trade);
       this.broadcast('trade_executed', trade);
 
-      console.log(`💰 REAL ${type}: ${quantity.toFixed(8)} ${symbol} at $${(order.average || currentPrice).toFixed(2)}`);
+      console.log(`\n✅ 💰 REAL ${type} COMPLETED: ${quantity.toFixed(8)} ${symbol} at $${(order.average || currentPrice).toFixed(2)}`);
+      console.log('==================== TRADE SUCCESS ====================\n');
     } catch (error) {
-      console.error('❌ Failed to execute real trade:', error instanceof Error ? error.message : error);
+      console.error('\n❌ ==================== TRADE FAILED ====================');
+      console.error(`   Type: ${type} ${symbol}`);
+      console.error(`   Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      if (error instanceof Error && error.stack) {
+        console.error(`   Stack trace: ${error.stack}`);
+      }
+      
+      // Check if it's a Binance API error
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error(`   Binance error code: ${(error as any).code}`);
+        console.error(`   Binance message: ${(error as any).msg || 'No message'}`);
+      }
+      
+      console.error('   Possible causes:');
+      console.error('   1. Geographic restriction - Binance may block your server location');
+      console.error('   2. Insufficient balance');
+      console.error('   3. Invalid API permissions - check if trading is enabled');
+      console.error('   4. Network connectivity issues');
+      console.error('   5. Binance API rate limits exceeded');
+      console.error('==================== TRADE FAILED ====================\n');
       
       // Broadcast error
       this.broadcast('trade_error', {

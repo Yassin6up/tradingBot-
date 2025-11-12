@@ -92,6 +92,20 @@ app.use((req, res, next) => {
   // Initialize Binance connection first
   await initializeBinanceIfConfigured();
   
+  // Auto-restart bot if it was running before server shutdown
+  try {
+    const { storage } = await import("./storage");
+    const { tradingEngine } = await import("./trading-engine");
+    
+    const botState = await storage.getBotState();
+    if (botState.status === 'running') {
+      log(`🔄 Auto-restarting trading bot (${botState.strategy} strategy, ${botState.mode} mode)`);
+      await tradingEngine.start(botState.strategy, botState.mode);
+    }
+  } catch (error) {
+    console.error('Failed to auto-restart bot:', error);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
