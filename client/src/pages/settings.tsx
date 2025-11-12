@@ -48,6 +48,43 @@ export default function Settings() {
     enabled: false, // Only fetch when user clicks button
   });
 
+  // Save credentials mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/binance/save-credentials', {
+        apiKey,
+        secret,
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({
+          title: t('common.success'),
+          description: 'API credentials saved successfully and encrypted in database',
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/binance/status'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/trading-mode'] });
+        
+        setApiKey('');
+        setSecret('');
+      } else {
+        toast({
+          title: t('common.error'),
+          description: data.message || 'Failed to save credentials',
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : 'Failed to save credentials',
+        variant: "destructive",
+      });
+    },
+  });
+
   // Test connection mutation
   const testMutation = useMutation({
     mutationFn: async () => {
@@ -200,24 +237,46 @@ export default function Settings() {
             </div>
           </div>
 
-          <Button
-            onClick={() => testMutation.mutate()}
-            disabled={testMutation.isPending}
-            className="w-full"
-            data-testid="button-test-connection"
-          >
-            {testMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t('settings.testing')}
-              </>
-            ) : (
-              <>
-                <Plug className="mr-2 h-4 w-4" />
-                {t('settings.testConnection')}
-              </>
-            )}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => testMutation.mutate()}
+              disabled={testMutation.isPending || !apiKey || !secret}
+              variant="outline"
+              className="flex-1"
+              data-testid="button-test-connection"
+            >
+              {testMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('settings.testing')}
+                </>
+              ) : (
+                <>
+                  <Plug className="mr-2 h-4 w-4" />
+                  {t('settings.testConnection')}
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending || !apiKey || !secret}
+              className="flex-1"
+              data-testid="button-save-credentials"
+            >
+              {saveMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Save Credentials
+                </>
+              )}
+            </Button>
+          </div>
         </Card>
 
         {/* Trading Mode Configuration */}

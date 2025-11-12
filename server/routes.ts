@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { tradingEngine } from "./trading-engine";
-import { startBotSchema, changeStrategySchema } from "@shared/schema";
+import { startBotSchema, changeStrategySchema, saveApiKeysSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -443,6 +443,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: false,
         message: error instanceof Error ? error.message : 'Connection test failed',
+      });
+    }
+  });
+
+  app.post("/api/binance/save-credentials", async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const validatedData = saveApiKeysSchema.parse(req.body);
+      
+      // Save encrypted credentials to database
+      await storage.saveApiKeys(validatedData.exchange, validatedData.apiKey, validatedData.secret);
+      
+      // Also update the active Binance service instance
+      const { getBinanceService } = await import("./services/binance");
+      const service = getBinanceService({ 
+        apiKey: validatedData.apiKey, 
+        secret: validatedData.secret 
+      });
+      await service.connect();
+      
+      res.json({ 
+        success: true,
+        message: 'Binance API credentials saved successfully',
+        connected: service.isApiConnected()
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation error',
+          message: error.errors[0]?.message || 'Invalid request data',
+          details: error.errors
+        });
+      }
+      
+      console.error('Failed to save Binance credentials:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to save credentials',
+        message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });

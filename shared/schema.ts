@@ -17,6 +17,26 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// API Keys table (for storing encrypted exchange credentials)
+export const apiKeys = sqliteTable("api_keys", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  exchange: text("exchange").notNull().default('binance'), // 'binance', etc.
+  apiKey: text("api_key").notNull(), // Encrypted
+  secretKey: text("secret_key").notNull(), // Encrypted
+  isActive: integer("is_active", { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKeyRow = typeof apiKeys.$inferSelect;
+
 // Trades table
 export const trades = sqliteTable("trades", {
   id: text("id").primaryKey(),
@@ -174,5 +194,12 @@ export const changeStrategySchema = z.object({
   strategy: z.enum(['safe', 'balanced', 'aggressive']),
 });
 
+export const saveApiKeysSchema = z.object({
+  apiKey: z.string().min(10, 'API key must be at least 10 characters'),
+  secret: z.string().min(10, 'Secret key must be at least 10 characters'),
+  exchange: z.string().default('binance'),
+});
+
 export type StartBotRequest = z.infer<typeof startBotSchema>;
 export type ChangeStrategyRequest = z.infer<typeof changeStrategySchema>;
+export type SaveApiKeysRequest = z.infer<typeof saveApiKeysSchema>;

@@ -1,7 +1,8 @@
-import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, type AIDecision, trades, portfolioSettings, users } from "@shared/schema";
+import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, type AIDecision, trades, portfolioSettings, users, apiKeys } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { encryptor } from "./utils/encryption";
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
@@ -45,6 +46,11 @@ export interface IStorage {
   addAIDecision(decision: AIDecision): Promise<void>;
   getAIDecisions(limit?: number): Promise<AIDecision[]>;
   getLatestAIDecision(): Promise<AIDecision | undefined>;
+  
+  // API Key methods
+  saveApiKeys(exchange: string, apiKey: string, secretKey: string): Promise<void>;
+  getApiKeys(exchange: string): Promise<{ apiKey: string; secretKey: string } | null>;
+  deleteApiKeys(exchange: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -337,6 +343,86 @@ export class DatabaseStorage implements IStorage {
         realBalanceUpdatedAt: new Date(),
       })
       .where(eq(portfolioSettings.id, 1));
+  }
+  
+  // API Key methods
+  async saveApiKeys(exchange: string, apiKey: string, secretKey: string): Promise<void> {
+    try {
+      // Encrypt the keys before storing
+      const encryptedApiKey = encryptor.encrypt(apiKey);
+      const encryptedSecretKey = encryptor.encrypt(secretKey);
+      
+      // Check if keys already exist for this exchange
+      const [existing] = await db.select()
+        .from(apiKeys)
+        .where(and(
+          eq(apiKeys.exchange, exchange),
+          eq(apiKeys.isActive, true)
+        ))
+        .limit(1);
+      
+      const now = new Date();
+      
+      if (existing) {
+        // Update existing keys
+        await db.update(apiKeys)
+          .set({
+            apiKey: encryptedApiKey,
+            secretKey: encryptedSecretKey,
+            updatedAt: now,
+          })
+          .where(eq(apiKeys.id, existing.id));
+      } else {
+        // Insert new keys
+        await db.insert(apiKeys).values({
+          exchange,
+          apiKey: encryptedApiKey,
+          secretKey: encryptedSecretKey,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save API keys:', error);
+      throw new Error('Failed to save API credentials');
+    }
+  }
+  
+  async getApiKeys(exchange: string): Promise<{ apiKey: string; secretKey: string } | null> {
+    try {
+      const [record] = await db.select()
+        .from(apiKeys)
+        .where(and(
+          eq(apiKeys.exchange, exchange),
+          eq(apiKeys.isActive, true)
+        ))
+        .limit(1);
+      
+      if (!record) {
+        return null;
+      }
+      
+      // Decrypt the keys before returning
+      const apiKey = encryptor.decrypt(record.apiKey);
+      const secretKey = encryptor.decrypt(record.secretKey);
+      
+      return { apiKey, secretKey };
+    } catch (error) {
+      console.error('Failed to retrieve API keys:', error);
+      return null;
+    }
+  }
+  
+  async deleteApiKeys(exchange: string): Promise<void> {
+    try {
+      await db.update(apiKeys)
+        .set({ isActive: false })
+        .where(eq(apiKeys.exchange, exchange));
+    } catch (error) {
+      console.error('Failed to delete API keys:', error);
+      throw new Error('Failed to delete API credentials');
+    }
   }
 }
 

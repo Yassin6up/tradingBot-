@@ -48,6 +48,18 @@ function initializeTables() {
   `);
   
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exchange TEXT NOT NULL DEFAULT 'binance',
+      api_key TEXT NOT NULL,
+      secret_key TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS trades (
       id TEXT PRIMARY KEY,
       symbol TEXT NOT NULL,

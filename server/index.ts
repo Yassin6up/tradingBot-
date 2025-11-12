@@ -6,15 +6,40 @@ const app = express();
 
 // Initialize Binance service on startup if API keys are available
 async function initializeBinanceIfConfigured() {
-  if (process.env.BINANCE_API_KEY && process.env.BINANCE_SECRET) {
+  let apiKey: string | undefined;
+  let secret: string | undefined;
+  let source: string = '';
+  
+  // Priority 1: Check database for saved credentials
+  try {
+    const { storage } = await import("./storage");
+    const savedKeys = await storage.getApiKeys('binance');
+    if (savedKeys) {
+      apiKey = savedKeys.apiKey;
+      secret = savedKeys.secretKey;
+      source = 'database (encrypted)';
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not load API keys from database:', error instanceof Error ? error.message : error);
+  }
+  
+  // Priority 2: Fallback to environment variables if no database credentials
+  if (!apiKey && process.env.BINANCE_API_KEY && process.env.BINANCE_SECRET) {
+    apiKey = process.env.BINANCE_API_KEY;
+    secret = process.env.BINANCE_SECRET;
+    source = 'environment variables';
+  }
+  
+  // Connect if we have credentials from any source
+  if (apiKey && secret) {
     try {
       const { getBinanceService } = await import("./services/binance");
       const binanceService = getBinanceService({
-        apiKey: process.env.BINANCE_API_KEY,
-        secret: process.env.BINANCE_SECRET,
+        apiKey,
+        secret,
       });
       await binanceService.connect();
-      log('✅ Binance API connected automatically from environment variables');
+      log(`✅ Binance API connected automatically from ${source}`);
     } catch (error) {
       console.error('❌ Failed to auto-connect Binance API:', error instanceof Error ? error.message : error);
     }
