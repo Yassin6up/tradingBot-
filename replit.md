@@ -65,32 +65,39 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage Solutions
 
 **Current Implementation**
-- In-memory storage using TypeScript Maps and arrays
-- No persistence between server restarts (intentional for sandbox mode)
-- Portfolio state, trade history, and bot configuration stored in RAM
+- **SQLite database** for persistent local storage (`data/app.db`)
+- Automatic table initialization on server startup
+- Database file created automatically - no setup required
+- WAL (Write-Ahead Logging) mode enabled for better concurrency
 
-**Database Schema (Prepared for PostgreSQL)**
-- Drizzle ORM configured with PostgreSQL dialect
+**Database Schema (SQLite)**
+- Drizzle ORM configured with better-sqlite3 driver
 - User authentication table defined (users table with username/password)
 - Schema exports TypeScript types for compile-time safety
-- Migration system ready via drizzle-kit for schema versioning
+- Tables created programmatically using raw SQL for simplicity
 
 **Data Models**
-- User: ID, username, password (for future authentication)
-- Portfolio: balance, profit metrics, trade statistics, performance analytics
-- Trade: symbol, type (BUY/SELL), price, quantity, timestamp, profit calculations
-- BotState: status, strategy, mode, uptime tracking
+- User: ID (text/UUID), username, password (for future authentication)
+- Portfolio Settings: ID, initial balance, creation timestamp
+- Trade: ID, symbol, type (BUY/SELL), price (text), quantity (text), timestamp (integer), profit, strategy, mode
+- BotState: In-memory (status, strategy, mode, uptime)
+- AI Decisions: In-memory (market conditions, strategy scores, reasoning)
+
+**Data Type Handling**
+- Decimal values stored as TEXT for precision preservation
+- Timestamps stored as INTEGER (Unix timestamps) with Drizzle's timestamp mode
+- Automatic conversion between JavaScript numbers and TEXT on read/write
 
 ### Authentication & Authorization
 
 **Current State**
 - User schema defined but authentication not yet implemented
-- Prepared for session-based authentication with connect-pg-simple for PostgreSQL sessions
+- Prepared for session-based authentication with file-based or in-memory sessions
 - Password hashing infrastructure ready (noted in dependencies)
 
 **Planned Architecture**
 - Session-based authentication using Express sessions
-- PostgreSQL session store for persistence
+- SQLite or in-memory session store for persistence
 - User registration and login endpoints prepared in schema
 
 ### Real-Time Communication
@@ -121,15 +128,16 @@ Preferred communication style: Simple, everyday language.
 - Single production server serves both API and static files
 
 **Environment Configuration**
-- Database URL configured via environment variables
+- SQLite database path configurable via APP_DB_FILE environment variable (defaults to `data/app.db`)
 - Development vs. production mode detection via NODE_ENV
 - Replit-specific plugins for development experience enhancements
+- No DATABASE_URL required - SQLite file is auto-created
 
 ## External Dependencies
 
 ### Third-Party APIs & Services
-- **CCXT Library** (referenced in Python bot): Cryptocurrency exchange integration library (currently simulated in Node.js implementation)
-- **Neon Database** (@neondatabase/serverless): Serverless PostgreSQL provider for production data storage
+- **CCXT Library**: Cryptocurrency exchange integration library (for Binance API access)
+- **better-sqlite3**: High-performance SQLite3 binding for Node.js with synchronous API
 
 ### UI Component Libraries
 - **Radix UI**: Headless component primitives for accessible UI elements (accordion, dialog, dropdown, select, tooltip, etc.)
