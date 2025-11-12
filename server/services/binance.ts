@@ -309,6 +309,79 @@ export class BinanceService {
       return [];
     }
   }
+
+  /**
+   * Place a market buy order
+   */
+  async placeBuyOrder(symbol: string, amountInUSDT: number): Promise<any> {
+    if (!this.exchange) {
+      throw new Error('Binance not connected. Call connect() first.');
+    }
+
+    if (!this.config.apiKey || !this.config.secret) {
+      throw new Error('API credentials required for trading');
+    }
+
+    try {
+      // Fetch current price to calculate quantity
+      const currentPrice = await this.fetchPrice(symbol);
+      const quantity = amountInUSDT / currentPrice;
+
+      // Place market buy order
+      const order = await this.exchange.createMarketBuyOrder(symbol, quantity);
+      
+      console.log(`✅ BUY order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice.toFixed(2)}`);
+      return order;
+    } catch (error) {
+      console.error(`Failed to place BUY order for ${symbol}:`, error instanceof Error ? error.message : error);
+      throw new Error(`Failed to place BUY order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Place a market sell order
+   */
+  async placeSellOrder(symbol: string, quantity: number): Promise<any> {
+    if (!this.exchange) {
+      throw new Error('Binance not connected. Call connect() first.');
+    }
+
+    if (!this.config.apiKey || !this.config.secret) {
+      throw new Error('API credentials required for trading');
+    }
+
+    try {
+      // Place market sell order
+      const order = await this.exchange.createMarketSellOrder(symbol, quantity);
+      
+      const currentPrice = await this.fetchPrice(symbol);
+      console.log(`✅ SELL order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice.toFixed(2)}`);
+      return order;
+    } catch (error) {
+      console.error(`Failed to place SELL order for ${symbol}:`, error instanceof Error ? error.message : error);
+      throw new Error(`Failed to place SELL order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get asset balance for a specific symbol (e.g., 'BTC', 'ETH')
+   */
+  async getAssetBalance(asset: string): Promise<number> {
+    if (!this.exchange) {
+      throw new Error('Binance not connected');
+    }
+
+    try {
+      const balance = await this.getBalance();
+      if (!balance || !balance.free) {
+        return 0;
+      }
+      return balance.free[asset] || 0;
+    } catch (error) {
+      console.error(`Failed to get balance for ${asset}:`, error);
+      return 0;
+    }
+  }
 }
 
 // Singleton instance for app-wide use

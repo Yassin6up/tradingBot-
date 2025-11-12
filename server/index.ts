@@ -4,6 +4,23 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
+// Initialize Binance service on startup if API keys are available
+async function initializeBinanceIfConfigured() {
+  if (process.env.BINANCE_API_KEY && process.env.BINANCE_SECRET) {
+    try {
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService({
+        apiKey: process.env.BINANCE_API_KEY,
+        secret: process.env.BINANCE_SECRET,
+      });
+      await binanceService.connect();
+      log('✅ Binance API connected automatically from environment variables');
+    } catch (error) {
+      console.error('❌ Failed to auto-connect Binance API:', error instanceof Error ? error.message : error);
+    }
+  }
+}
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
@@ -47,6 +64,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize Binance connection first
+  await initializeBinanceIfConfigured();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

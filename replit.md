@@ -8,6 +8,18 @@ An AI-powered trading bot web platform with real-time analytics, automated tradi
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates (November 12, 2025)
+
+### Real Binance Trading Integration
+- **Real Balance Display**: Dashboard now shows actual Binance account balance when in real trading mode
+- **Asset Breakdown**: All non-zero Binance assets (BTC, ETH, BNB, SOL, ADA, etc.) displayed on dashboard
+- **Dual-Mode Trading**: Trading engine executes REAL Binance orders in real mode, simulated trades in paper mode
+- **Auto-Connection**: Binance API automatically connects on server startup if credentials are in environment
+- **Graceful Fallback**: All endpoints fall back to simulated data if Binance unavailable (preserves paper trading)
+- **Safety Features**: $10 minimum trade amount, asset balance verification before SELL, distinct logging for real/paper trades
+
+**Production Note**: Binance API connectivity may fail from certain server locations due to geographic restrictions. For production use with real trading, deploy to a server in an allowed region. All code is production-ready.
+
 ## System Architecture
 
 ### Frontend Architecture

@@ -9,6 +9,7 @@ import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { CoinSelector } from "@/components/coin-selector";
 import { CoinPriceSlider } from "@/components/coin-price-slider";
+import { Card } from "@/components/ui/card";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
@@ -285,12 +286,13 @@ export default function Dashboard() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
-            title={t('dashboard.balance')}
+            title={portfolio?.realMode ? t('dashboard.realBalance') || 'Real Balance' : t('dashboard.balance')}
             value={portfolio ? formatCurrency(portfolio.balance) : '$0.00'}
             change={portfolio?.totalProfit}
             changePercent={portfolio?.totalProfitPercent}
             icon={<Wallet className="h-4 w-4" />}
             isLoading={portfolioLoading}
+            data-testid="stat-balance"
           />
           <StatCard
             title={t('dashboard.profit')}
@@ -334,6 +336,23 @@ export default function Dashboard() {
             />
           )}
         </div>
+
+        {/* Real Binance Balance Breakdown - Only show in real mode */}
+        {portfolio?.realMode && portfolio?.assets && Object.keys(portfolio.assets).length > 0 && (
+          <Card className="p-6 mb-6" data-testid="card-real-assets">
+            <h3 className="text-lg font-semibold mb-4">Real Binance Assets</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {Object.entries(portfolio.assets)
+                .sort(([, a], [, b]) => b - a)
+                .map(([asset, amount]) => (
+                  <div key={asset} className="p-3 rounded-md bg-muted/30 border border-border" data-testid={`asset-${asset}`}>
+                    <div className="text-xs text-muted-foreground font-medium mb-1">{asset}</div>
+                    <div className="text-sm font-bold tabular-nums">{amount.toFixed(8)}</div>
+                  </div>
+                ))}
+            </div>
+          </Card>
+        )}
 
         {/* Charts and Trade History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

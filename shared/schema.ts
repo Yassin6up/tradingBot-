@@ -98,6 +98,8 @@ export interface Portfolio {
   winningTrades: number;
   losingTrades: number;
   bestPerformingCoin: string;
+  realMode?: boolean;
+  assets?: Record<string, number>; // Real Binance assets breakdown (BTC, ETH, etc.)
 }
 
 export interface BotState {

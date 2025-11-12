@@ -352,12 +352,116 @@ class TradingEngine {
     }
 
     const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-    const currentPrice = this.priceData.get(symbol) || 1000;
     const config = strategies[this.currentStrategy];
 
     // Randomly decide buy or sell
     const type: 'BUY' | 'SELL' = Math.random() > 0.5 ? 'BUY' : 'SELL';
 
+    // Check if we're in REAL trading mode
+    if (this.mode === 'real') {
+      // REAL BINANCE TRADING
+      await this.executeRealTrade(symbol, type, config, riskMetrics);
+    } else {
+      // PAPER TRADING (SIMULATION)
+      await this.executeSimulatedTrade(symbol, type, config, riskMetrics, portfolio);
+    }
+  }
+
+  /**
+   * Execute a REAL trade using Binance API
+   */
+  private async executeRealTrade(
+    symbol: string, 
+    type: 'BUY' | 'SELL', 
+    config: StrategyConfig,
+    riskMetrics: RiskMetrics
+  ) {
+    try {
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+
+      if (!binanceService.isApiConnected()) {
+        console.error('❌ Cannot execute real trade: Binance not connected');
+        return;
+      }
+
+      // Get real balance in USDT
+      const realBalance = await binanceService.getTotalBalanceUSDT();
+      const currentPrice = await binanceService.fetchPrice(symbol);
+      
+      // Calculate position size based on real balance
+      const positionSize = riskMetrics.recommendedPositionSize;
+      const tradeAmount = Math.min(positionSize, realBalance * config.riskPerTrade);
+
+      // Safety check: minimum trade amount
+      if (tradeAmount < 10) {
+        console.warn(`⚠️ Real trade amount too small: $${tradeAmount.toFixed(2)} (minimum $10)`);
+        return;
+      }
+
+      let order: any;
+      let quantity: number;
+
+      if (type === 'BUY') {
+        // Execute BUY order
+        order = await binanceService.placeBuyOrder(symbol, tradeAmount);
+        quantity = order.filled || (tradeAmount / currentPrice);
+      } else {
+        // Execute SELL order - need to have the asset first
+        const asset = symbol.split('/')[0]; // Extract base asset (e.g., 'BTC' from 'BTC/USDT')
+        const assetBalance = await binanceService.getAssetBalance(asset);
+        
+        if (assetBalance === 0) {
+          console.warn(`⚠️ Cannot SELL ${asset}: No balance available`);
+          return;
+        }
+
+        quantity = Math.min(assetBalance, tradeAmount / currentPrice);
+        order = await binanceService.placeSellOrder(symbol, quantity);
+      }
+
+      // Record the trade (profit will be calculated later when position closes)
+      const trade: Trade = {
+        id: randomUUID(),
+        symbol,
+        type,
+        price: order.average || currentPrice,
+        quantity,
+        timestamp: Date.now(),
+        profit: 0, // Real trades track profit separately
+        profitPercent: 0,
+        strategy: this.currentStrategy,
+        mode: 'real',
+      };
+
+      await storage.addTrade(trade);
+      this.broadcast('trade_executed', trade);
+
+      console.log(`💰 REAL ${type}: ${quantity.toFixed(8)} ${symbol} at $${(order.average || currentPrice).toFixed(2)}`);
+    } catch (error) {
+      console.error('❌ Failed to execute real trade:', error instanceof Error ? error.message : error);
+      
+      // Broadcast error
+      this.broadcast('trade_error', {
+        message: `Failed to execute real trade: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        symbol,
+        type,
+      });
+    }
+  }
+
+  /**
+   * Execute a SIMULATED trade (paper trading)
+   */
+  private async executeSimulatedTrade(
+    symbol: string,
+    type: 'BUY' | 'SELL',
+    config: StrategyConfig,
+    riskMetrics: RiskMetrics,
+    portfolio: any
+  ) {
+    const currentPrice = this.priceData.get(symbol) || 1000;
+    
     // Use risk-adjusted position sizing
     const positionSize = riskMetrics.recommendedPositionSize;
     const tradeAmount = Math.min(positionSize, portfolio.balance * config.riskPerTrade);
@@ -384,15 +488,13 @@ class TradingEngine {
       profit,
       profitPercent: profitPercent * 100,
       strategy: this.currentStrategy,
-      mode: this.mode,
+      mode: 'paper',
     };
 
     await storage.addTrade(trade);
-
-    // Broadcast trade event
     this.broadcast('trade_executed', trade);
 
-    console.log(`Trade executed: ${type} ${quantity.toFixed(6)} ${symbol} at $${currentPrice.toFixed(2)} - Profit: $${profit.toFixed(2)}`);
+    console.log(`📝 PAPER ${type}: ${quantity.toFixed(6)} ${symbol} at $${currentPrice.toFixed(2)} - P/L: $${profit.toFixed(2)}`);
   }
 
   public getChartHistory(): ChartDataPoint[] {
