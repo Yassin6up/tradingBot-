@@ -1,11 +1,10 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, integer } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Users table (keeping existing)
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
 });
@@ -19,15 +18,15 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Trades table
-export const trades = pgTable("trades", {
-  id: varchar("id").primaryKey(),
+export const trades = sqliteTable("trades", {
+  id: text("id").primaryKey(),
   symbol: text("symbol").notNull(),
   type: text("type").notNull(), // 'BUY' or 'SELL'
-  price: decimal("price", { precision: 20, scale: 8 }).notNull(),
-  quantity: decimal("quantity", { precision: 20, scale: 8 }).notNull(),
-  timestamp: timestamp("timestamp").notNull(),
-  profit: decimal("profit", { precision: 20, scale: 8 }).notNull(),
-  profitPercent: decimal("profit_percent", { precision: 10, scale: 4 }).notNull(),
+  price: text("price").notNull(), // Store as string to maintain precision
+  quantity: text("quantity").notNull(), // Store as string to maintain precision
+  timestamp: integer("timestamp", { mode: 'timestamp' }).notNull(),
+  profit: text("profit").notNull(), // Store as string to maintain precision
+  profitPercent: text("profit_percent").notNull(), // Store as string to maintain precision
   strategy: text("strategy").notNull(), // 'safe', 'balanced', 'aggressive'
   mode: text("mode").notNull(), // 'sandbox' or 'real'
 });
@@ -37,10 +36,10 @@ export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type TradeRow = typeof trades.$inferSelect;
 
 // Portfolio settings table (single row)
-export const portfolioSettings = pgTable("portfolio_settings", {
-  id: integer("id").primaryKey().default(1),
-  initialBalance: decimal("initial_balance", { precision: 20, scale: 2 }).notNull().default('10000'),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+export const portfolioSettings = sqliteTable("portfolio_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  initialBalance: text("initial_balance").notNull().default('10000'), // Store as string
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const insertPortfolioSettingsSchema = createInsertSchema(portfolioSettings).omit({ id: true, createdAt: true });
