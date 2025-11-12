@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { createChart, ColorType } from "lightweight-charts";
+import { createChart, ColorType, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +50,7 @@ const INDICATORS = [
 
 export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: AdvancedChartProps) {
   const { t } = useTranslation();
-  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
   const indicatorSeriesRef = useRef<Map<string, any>>(new Map());
@@ -81,11 +81,18 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
     refetchInterval: 10000,
   });
 
-  // Initialize chart
+  // Initialize chart when container is set
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainer) {
+      return;
+    }
 
-    const chart: any = createChart(chartContainerRef.current, {
+    const containerWidth = chartContainer.clientWidth;
+    if (containerWidth === 0) {
+      return;
+    }
+
+    const chart = createChart(chartContainer, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#9CA3AF',
@@ -94,7 +101,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
         vertLines: { color: '#1F2937' },
         horzLines: { color: '#1F2937' },
       },
-      width: chartContainerRef.current.clientWidth,
+      width: containerWidth,
       height: 500,
       timeScale: {
         timeVisible: true,
@@ -105,7 +112,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
       },
     });
 
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#10B981',
       downColor: '#EF4444',
       borderUpColor: '#10B981',
@@ -119,8 +126,9 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
 
     // Handle resize
     const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      if (chartContainer && chart) {
+        const newWidth = chartContainer.clientWidth;
+        chart.applyOptions({ width: newWidth });
       }
     };
 
@@ -129,19 +137,25 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.remove();
+      chartRef.current = null;
+      candlestickSeriesRef.current = null;
     };
-  }, []);
+  }, [chartContainer]);
 
   // Update chart data
   useEffect(() => {
-    if (!data || !candlestickSeriesRef.current) return;
+    if (!data || !candlestickSeriesRef.current || !chartRef.current) {
+      return;
+    }
 
     const candles = Array.isArray(data) ? data : data.candles;
-    if (!candles || candles.length === 0) return;
+    if (!candles || candles.length === 0) {
+      return;
+    }
 
     // Format candlestick data
     const formattedData = candles.map((c: any) => ({
-      time: Math.floor(c.timestamp / 1000) as any, // Convert to seconds
+      time: Math.floor(c.timestamp / 1000) as any,
       open: c.open,
       high: c.high,
       low: c.low,
@@ -153,17 +167,24 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
     // Update indicators
     if (!Array.isArray(data) && chartRef.current) {
       // Clear existing indicator series
-      indicatorSeriesRef.current.forEach((series) => {
-        chartRef.current?.removeSeries(series);
-      });
-      indicatorSeriesRef.current.clear();
+      try {
+        indicatorSeriesRef.current.forEach((series) => {
+          if (chartRef.current) {
+            chartRef.current.removeSeries(series);
+          }
+        });
+        indicatorSeriesRef.current.clear();
+      } catch (error) {
+        // Chart may have been disposed
+        indicatorSeriesRef.current.clear();
+      }
 
       // Add new indicator series
       const chartData = data as ChartData;
       INDICATORS.forEach((indicator) => {
         const indicatorValues = (chartData as any)[indicator.id];
         if (indicatorValues && activeIndicators.includes(indicator.id)) {
-          const lineSeries = chartRef.current!.addLineSeries({
+          const lineSeries = chartRef.current!.addSeries(LineSeries, {
             color: indicator.color,
             lineWidth: 2,
             title: indicator.label,
@@ -185,7 +206,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
         const { upper, middle, lower } = chartData2.bollingerBands;
         
         if (upper) {
-          const upperSeries = chartRef.current!.addLineSeries({
+          const upperSeries = chartRef.current!.addSeries(LineSeries, {
             color: '#6B7280',
             lineWidth: 1,
             title: 'BB Upper',
@@ -199,7 +220,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
         }
 
         if (middle) {
-          const middleSeries = chartRef.current!.addLineSeries({
+          const middleSeries = chartRef.current!.addSeries(LineSeries, {
             color: '#9CA3AF',
             lineWidth: 1,
             title: 'BB Middle',
@@ -213,7 +234,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
         }
 
         if (lower) {
-          const lowerSeries = chartRef.current!.addLineSeries({
+          const lowerSeries = chartRef.current!.addSeries(LineSeries, {
             color: '#6B7280',
             lineWidth: 1,
             title: 'BB Lower',
@@ -317,7 +338,7 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
       </div>
 
       {/* Chart */}
-      <div ref={chartContainerRef} className="relative" data-testid="chart-container" />
+      <div ref={setChartContainer} className="relative w-full min-h-[500px]" data-testid="chart-container" />
     </Card>
   );
 }

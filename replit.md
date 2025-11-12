@@ -10,6 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (November 12, 2025)
 
+### Advanced Chart System (November 12, 2025)
+- **✅ Chart Rendering Fixed**: Advanced candlestick chart now displays properly using lightweight-charts v5
+- **API Migration**: Updated to lightweight-charts v5 API (`addSeries(CandlestickSeries)` instead of deprecated `addCandlestickSeries()`)
+- **React Integration**: Fixed chart initialization timing with callback ref pattern to ensure container is ready
+- **Multiple Timeframes**: Supports 1m, 5m, 15m, 1H, 4H, 1D candlestick intervals
+- **Technical Indicators**: SMA (20/50), EMA (12/26), RSI, MACD, Bollinger Bands ready for overlay
+- **Real-time Updates**: Chart data refreshes every 10 seconds with live market data
+
 ### Real Binance Trading Integration
 - **Real Balance Display**: Dashboard now shows actual Binance account balance when in real trading mode
 - **Asset Breakdown**: All non-zero Binance assets (BTC, ETH, BNB, SOL, ADA, etc.) displayed on dashboard
