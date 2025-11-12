@@ -46,7 +46,7 @@ class TradingEngine {
   private priceData: Map<string, number> = new Map();
   private chartHistory: ChartDataPoint[] = [];
   private currentStrategy: StrategyType = 'balanced';
-  private mode: TradingMode = 'sandbox';
+  private mode: TradingMode = 'paper';
   private wsClients: Set<any> = new Set();
   private lastStrategyChangeTime: number = 0;
   private readonly MIN_STRATEGY_DWELL_MS = 300000; // 5 minutes minimum between strategy changes
