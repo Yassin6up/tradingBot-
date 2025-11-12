@@ -11,13 +11,14 @@ interface BotControlsProps {
   botState: BotState;
   onStart: (strategy: StrategyType, mode: TradingMode) => void;
   onStop: () => void;
+  onModeChange: (mode: TradingMode) => void;
   onStrategyChange: (strategy: StrategyType) => void;
   onAIToggle: (enabled: boolean) => void;
   latestAIDecision: AIDecision | null;
   isLoading?: boolean;
 }
 
-export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIToggle, latestAIDecision, isLoading }: BotControlsProps) {
+export function BotControls({ botState, onStart, onStop, onModeChange, onStrategyChange, onAIToggle, latestAIDecision, isLoading }: BotControlsProps) {
   const { t } = useTranslation();
   
   const strategies: { type: StrategyType; name: string; risk: string; profit: string }[] = [
@@ -143,17 +144,18 @@ export function BotControls({ botState, onStart, onStop, onStrategyChange, onAIT
                 {t('bot.modeLabel')}
               </Label>
               <p className="text-xs text-muted-foreground">
-                {mode === 'sandbox' ? t('bot.modes.sandboxDesc') : t('bot.modes.realDesc')}
+                {mode === 'paper' ? t('bot.modes.paperDesc') : t('bot.modes.realDesc')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={mode === 'sandbox' ? 'secondary' : 'destructive'} data-testid="badge-trading-mode">
-              {mode === 'sandbox' ? t('bot.modes.sandbox') : t('bot.modes.real')}
+            <Badge variant={mode === 'paper' ? 'secondary' : 'destructive'} data-testid="badge-trading-mode">
+              {mode === 'paper' ? t('bot.modes.paper') : t('bot.modes.real')}
             </Badge>
             <Switch
               id="mode-switch"
               checked={mode === 'real'}
+              onCheckedChange={() => onModeChange(mode === 'real' ? 'paper' : 'real')}
               disabled={isRunning || isLoading}
               data-testid="switch-trading-mode"
             />

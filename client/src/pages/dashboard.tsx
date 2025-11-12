@@ -159,6 +159,32 @@ export default function Dashboard() {
     },
   });
 
+  // Change trading mode mutation
+  const changeTradingModeMutation = useMutation({
+    mutationFn: async (mode: TradingMode) => {
+      const response = await apiRequest('POST', '/api/trading-mode', { 
+        mode,
+        confirmation: mode === 'real' ? true : undefined
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trading-mode'] });
+      toast({
+        title: t('common.success'),
+        description: t('bot.messages.modeChanged'),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: error.message || t('bot.messages.modeChangeFailed'),
+        variant: "destructive",
+      });
+    },
+  });
+
   // Subscribe to WebSocket events
   useEffect(() => {
     const unsubscribePrices = subscribe('price_update', () => {
@@ -237,6 +263,10 @@ export default function Dashboard() {
     if (!enabled) {
       setLatestAIDecision(null);
     }
+  };
+
+  const handleModeChange = (mode: TradingMode) => {
+    changeTradingModeMutation.mutate(mode);
   };
 
   const formatCurrency = (value: number) => {
@@ -329,10 +359,11 @@ export default function Dashboard() {
               botState={{ ...botState, uptime }}
               onStart={handleStart}
               onStop={handleStop}
+              onModeChange={handleModeChange}
               onStrategyChange={handleStrategyChange}
               onAIToggle={handleAIToggle}
               latestAIDecision={latestAIDecision}
-              isLoading={startBotMutation.isPending || stopBotMutation.isPending || changeStrategyMutation.isPending || toggleAIMutation.isPending}
+              isLoading={startBotMutation.isPending || stopBotMutation.isPending || changeStrategyMutation.isPending || toggleAIMutation.isPending || changeTradingModeMutation.isPending}
             />
           )}
         </div>

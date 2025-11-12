@@ -33,7 +33,9 @@
       "started": "Trading bot is now running",
       "stopped": "Trading bot has been stopped",
       "startFailed": "Failed to start bot",
-      "stopFailed": "Failed to stop bot"
+      "stopFailed": "Failed to stop bot",
+      "modeChanged": "Trading mode updated successfully",
+      "modeChangeFailed": "Failed to change trading mode"
     },
     "strategyLabel": "Trading Strategy",
     "strategies": {
@@ -47,9 +49,9 @@
     "target": "Target",
     "modeLabel": "Trading Mode",
     "modes": {
-      "sandbox": "Sandbox",
-      "real": "Real",
-      "sandboxDesc": "Virtual money (safe)",
+      "paper": "Paper Trading",
+      "real": "Real Trading",
+      "paperDesc": "Virtual money (safe)",
       "realDesc": "Real money (live)"
     },
     "aiLabel": "AI Strategy Selection",
@@ -64,7 +66,7 @@
     "stopBot": "Stop Bot",
     "strategy": "Strategy",
     "mode": "Mode",
-    "sandbox": "Sandbox",
+    "paper": "Paper Trading",
     "real": "Real Trading",
     "uptime": "Uptime",
     "safe": "Safe",
@@ -108,7 +110,7 @@
     "binanceNote": "Binance API integration allows you to fetch real-time market data and execute live trades. You can test the connection without providing credentials to fetch public price data. For trading operations, you'll need to provide your Binance API key and secret.",
     "apiKey": "API Key (Optional)",
     "apiSecret": "API Secret (Optional)",
-    "testnet": "Use Testnet (Sandbox Mode)",
+    "testnet": "Use Testnet (Paper Trading Mode)",
     "testConnection": "Test Connection",
     "testing": "Testing Connection...",
     "howTo": "How to Get Binance API Credentials",
@@ -120,7 +122,7 @@
     "step6": "For safety, enable \"Restrict access to trusted IPs only\"",
     "step7": "Enable only \"Enable Reading\" for monitoring, or \"Enable Spot & Margin Trading\" for automated trading",
     "securityWarning": "Security Warning",
-    "securityNote": "Never share your API secret with anyone. Store it securely and only use it in trusted applications. Consider using the testnet/sandbox mode first to test the bot without risking real funds."
+    "securityNote": "Never share your API secret with anyone. Store it securely and only use it in trusted applications. Consider using the testnet/paper trading mode first to test the bot without risking real funds."
   },
   "trades": {
     "title": "Trade History",
