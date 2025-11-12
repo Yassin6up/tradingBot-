@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StatCard } from "@/components/stat-card";
-import { PriceChart } from "@/components/price-chart";
+import { AdvancedChart } from "@/components/advanced-chart";
 import { TradeHistory } from "@/components/trade-history";
 import { BotControls } from "@/components/bot-controls";
 import { Navigation } from "@/components/navigation";
@@ -13,7 +13,7 @@ import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Portfolio, BotState, Trade, ChartDataPoint, StrategyType, TradingMode, AIDecision } from "@shared/schema";
+import type { Portfolio, BotState, Trade, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -39,22 +39,6 @@ export default function Dashboard() {
   const { data: trades = [], isLoading: tradesLoading } = useQuery<Trade[]>({
     queryKey: ['/api/trades'],
     refetchInterval: 2000,
-  });
-
-  // Fetch chart data for selected coin
-  const { data: chartData = [], isLoading: chartLoading, isError: chartError } = useQuery<ChartDataPoint[]>({
-    queryKey: ['/api/chart', selectedCoin],
-    queryFn: async () => {
-      const encodedSymbol = encodeURIComponent(selectedCoin);
-      const response = await fetch(`/api/chart/${encodedSymbol}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch chart data');
-      }
-      return response.json();
-    },
-    refetchInterval: 5000,
-    retry: false, // Don't retry on Binance API requirement error
   });
 
   // Start bot mutation
@@ -354,15 +338,13 @@ export default function Dashboard() {
         {/* Charts and Trade History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-semibold">{t('chart.title') || 'Price Chart'}</h2>
               <CoinSelector value={selectedCoin} onValueChange={setSelectedCoin} />
             </div>
-            <PriceChart 
-              data={chartData} 
-              symbol={selectedCoin} 
-              isLoading={chartLoading} 
-              isError={chartError}
+            <AdvancedChart 
+              symbol={selectedCoin}
+              defaultTimeframe="5m"
             />
           </div>
           <div>

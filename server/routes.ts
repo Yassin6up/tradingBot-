@@ -127,10 +127,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chart data endpoint with symbol support - REQUIRES Binance API
+  // Chart data endpoint with symbol support and technical indicators
   app.get("/api/chart/:symbol?", async (req, res) => {
     try {
       const symbol = req.params.symbol || 'BTC/USDT';
+      const timeframe = (req.query.timeframe as string) || '5m';
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
+      const indicators = req.query.indicators ? (req.query.indicators as string).split(',') : [];
+      
+      // Validate timeframe
+      const validTimeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
+      if (!validTimeframes.includes(timeframe)) {
+        return res.status(400).json({ 
+          error: 'Invalid timeframe', 
+          message: `Timeframe must be one of: ${validTimeframes.join(', ')}` 
+        });
+      }
       
       // Fetch real data from Binance - API connection is REQUIRED
       const { getBinanceService } = await import("./services/binance");
@@ -144,7 +156,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch real historical OHLCV data from Binance
-      const chartData = await binanceService.fetchOHLCV(symbol, '5m', 100);
+      const chartData = await binanceService.fetchOHLCV(symbol, timeframe, Math.min(limit, 1000));
+      
+      // Apply technical indicators if requested
+      if (indicators.length > 0) {
+        const { SMA, EMA, RSI, MACD, BollingerBands } = await import('technicalindicators');
+        const closes = chartData.map((c: any) => c.close);
+        const result: any = { candles: chartData };
+        
+        // Calculate indicators
+        if (indicators.includes('sma20')) {
+          const sma20 = SMA.calculate({ period: 20, values: closes });
+          result.sma20 = sma20;
+        }
+        
+        if (indicators.includes('sma50')) {
+          const sma50 = SMA.calculate({ period: 50, values: closes });
+          result.sma50 = sma50;
+        }
+        
+        if (indicators.includes('ema12')) {
+          const ema12 = EMA.calculate({ period: 12, values: closes });
+          result.ema12 = ema12;
+        }
+        
+        if (indicators.includes('ema26')) {
+          const ema26 = EMA.calculate({ period: 26, values: closes });
+          result.ema26 = ema26;
+        }
+        
+        if (indicators.includes('rsi')) {
+          const rsi = RSI.calculate({ period: 14, values: closes });
+          result.rsi = rsi;
+        }
+        
+        if (indicators.includes('macd')) {
+          const macd = MACD.calculate({
+            values: closes,
+            fastPeriod: 12,
+            slowPeriod: 26,
+            signalPeriod: 9,
+            SimpleMAOscillator: false,
+            SimpleMASignal: false,
+          });
+          result.macd = macd;
+        }
+        
+        if (indicators.includes('bb')) {
+          const bb = BollingerBands.calculate({
+            period: 20,
+            values: closes,
+            stdDev: 2,
+          });
+          
+          // Transform from array of objects to object with arrays
+          result.bollingerBands = {
+            upper: bb.map(b => b?.upper ?? null),
+            middle: bb.map(b => b?.middle ?? null),
+            lower: bb.map(b => b?.lower ?? null),
+          };
+        }
+        
+        return res.json(result);
+      }
       
       return res.json(chartData);
     } catch (error) {
