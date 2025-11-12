@@ -10,6 +10,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (November 12, 2025)
 
+### Safety Features & Small Account Support (November 12, 2025)
+- **✅ Position Tracking System**: New positions table tracks open trades with stop-loss/take-profit levels
+- **Lower Minimum Trade**: Reduced from $10 to $5 to support small accounts ($119+ balance)
+- **Safer Risk Percentages**: Conservative risk limits protect capital
+  - Safe: 1% risk per trade (only $1.19 at risk with $119 balance)
+  - Balanced: 2% risk per trade (only $2.38 at risk with $119 balance)
+  - Aggressive: 3% risk per trade (only $3.57 at risk with $119 balance)
+- **Realistic Profit Targets**: Achievable targets aligned with market conditions
+  - Safe: 1.5-3% profit target
+  - Balanced: 2.5-5% profit target
+  - Aggressive: 4-8% profit target
+- **Auto Stop-Loss**: Positions automatically exit when loss reaches risk percentage (pending implementation)
+- **Auto Take-Profit**: Positions automatically lock in gains at profit target (pending implementation)
+- **Position Persistence**: Open positions survive server restarts via database storage
+
+## Recent Updates (November 12, 2025)
+
 ### Advanced Chart System (November 12, 2025)
 - **✅ Chart Rendering Fixed**: Advanced candlestick chart now displays properly using lightweight-charts v5
 - **API Migration**: Updated to lightweight-charts v5 API (`addSeries(CandlestickSeries)` instead of deprecated `addCandlestickSeries()`)
