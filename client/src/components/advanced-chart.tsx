@@ -60,9 +60,25 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
 
   // Fetch chart data with indicators
   const { data, isLoading, isError, error } = useQuery<ChartData | any[]>({
-    queryKey: ['/api/chart', symbol, { timeframe, indicators: activeIndicators.join(',') }],
-    enabled: true,
-    refetchInterval: 10000, // Refresh every 10 seconds
+    queryKey: ['chartData', symbol, timeframe, activeIndicators],
+    queryFn: async () => {
+      const encodedSymbol = encodeURIComponent(symbol);
+      const url = `/api/chart/${encodedSymbol}?timeframe=${timeframe}&indicators=${activeIndicators.join(',')}`;
+      
+      console.log('📡 Fetching chart data from:', url);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch chart data: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Chart data received:', result);
+      
+      return result;
+    },
+    enabled: Boolean(symbol),
+    refetchInterval: 10000,
   });
 
   // Initialize chart
