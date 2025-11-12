@@ -6,7 +6,8 @@ export class APIKeyEncryption {
   private masterKey: string;
 
   constructor(masterKey?: string) {
-    this.masterKey = masterKey || process.env.MASTER_ENCRYPTION_KEY || '';
+    // Trim whitespace from the master key
+    this.masterKey = (masterKey || process.env.MASTER_ENCRYPTION_KEY || '').trim();
     
     if (!this.masterKey) {
       const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -25,7 +26,10 @@ export class APIKeyEncryption {
     }
     
     if (this.masterKey.length !== 64) {
-      throw new Error('Master encryption key must be 64 hex characters (32 bytes)');
+      throw new Error(
+        `Master encryption key must be 64 hex characters (32 bytes), got ${this.masterKey.length} characters. ` +
+        `Current value: "${this.masterKey.substring(0, 10)}..."`
+      );
     }
   }
 
