@@ -333,6 +333,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get real Binance balance
+  app.get("/api/binance/balance", async (_req, res) => {
+    try {
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      if (!binanceService.isApiConnected()) {
+        return res.status(400).json({ 
+          error: 'Binance not connected',
+          message: 'Please configure your Binance API credentials first'
+        });
+      }
+
+      const balance = await binanceService.getSimplifiedBalance();
+      
+      // Update cached balance in database
+      await storage.updateRealBalance(balance.total);
+      
+      res.json(balance);
+    } catch (error) {
+      console.error('Error fetching Binance balance:', error);
+      res.status(500).json({ error: 'Failed to fetch balance from Binance' });
+    }
+  });
+
+  // Trading Mode endpoints
+  app.get("/api/trading-mode", async (_req, res) => {
+    try {
+      const modeSettings = await storage.getTradingMode();
+      res.json(modeSettings);
+    } catch (error) {
+      console.error('Error fetching trading mode:', error);
+      res.status(500).json({ error: 'Failed to fetch trading mode' });
+    }
+  });
+
+  app.post("/api/trading-mode", async (req, res) => {
+    try {
+      const { changeTradingModeSchema } = await import("@shared/schema");
+      const data = changeTradingModeSchema.parse(req.body);
+      
+      // Prepare trading mode settings
+      const modeSettings: any = {
+        mode: data.mode,
+        maxPositionSize: data.maxPositionSize ? parseFloat(data.maxPositionSize) : 1000,
+        dailyLossLimit: data.dailyLossLimit ? parseFloat(data.dailyLossLimit) : 500,
+      };
+      
+      // Add confirmation timestamp if switching to real mode
+      if (data.mode === 'real') {
+        if (!data.confirmation) {
+          return res.status(400).json({ 
+            error: 'Confirmation required',
+            message: 'You must explicitly confirm switching to real trading mode. This is a safety feature to prevent accidental real money trading.'
+          });
+        }
+        modeSettings.confirmedAt = new Date();
+      }
+      
+      await storage.setTradingMode(modeSettings);
+      
+      // Update bot state to match
+      await storage.updateBotState({ mode: data.mode });
+      
+      res.json({ success: true, mode: data.mode });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      } else {
+        console.error('Error changing trading mode:', error);
+        res.status(500).json({ 
+          error: 'Failed to change trading mode',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+  });
+
   // Risk Management endpoints
   app.get("/api/risk/metrics", async (_req, res) => {
     try {

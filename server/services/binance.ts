@@ -152,6 +152,87 @@ export class BinanceService {
   }
 
   /**
+   * Get total balance in USDT equivalent
+   * Calculates total portfolio value by converting all assets to USDT
+   */
+  async getTotalBalanceUSDT(balanceData?: any): Promise<number> {
+    // Reuse balance if provided to avoid duplicate API calls
+    const balance = balanceData || await this.getBalance();
+    if (!balance) {
+      throw new Error('Failed to fetch balance');
+    }
+
+    let totalUSDT = 0;
+    
+    // Stablecoins that are 1:1 with USD (no conversion needed)
+    const stablecoins = new Set(['USDT', 'BUSD', 'USDC', 'TUSD', 'USDP', 'DAI']);
+
+    if (!balance.total) {
+      return 0;
+    }
+
+    // Process all assets
+    for (const [asset, amount] of Object.entries(balance.total)) {
+      if (typeof amount !== 'number' || amount <= 0.00001) {
+        continue; // Skip dust and invalid amounts
+      }
+
+      // Add stablecoins directly (they're already ~1 USD each)
+      if (stablecoins.has(asset)) {
+        totalUSDT += amount;
+        continue;
+      }
+
+      // Convert other assets to USDT
+      try {
+        const symbol = `${asset}/USDT`;
+        const price = await this.fetchPrice(symbol);
+        totalUSDT += amount * price;
+      } catch (error) {
+        console.warn(`Failed to convert ${asset} to USDT (pair may not exist):`, error instanceof Error ? error.message : error);
+        // Try BTC as intermediate if direct USDT pair doesn't exist
+        try {
+          if (asset !== 'BTC') {
+            const btcPair = `${asset}/BTC`;
+            const btcPrice = await this.fetchPrice(btcPair);
+            const btcUsdtPrice = await this.fetchPrice('BTC/USDT');
+            totalUSDT += amount * btcPrice * btcUsdtPrice;
+          }
+        } catch (fallbackError) {
+          console.warn(`Failed to convert ${asset} via BTC fallback, skipping`);
+        }
+      }
+    }
+
+    return totalUSDT;
+  }
+
+  /**
+   * Get simplified balance structure for frontend display
+   */
+  async getSimplifiedBalance(): Promise<{ total: number; assets: Record<string, number> }> {
+    const balance = await this.getBalance();
+    if (!balance) {
+      return { total: 0, assets: {} };
+    }
+
+    // Extract non-zero balances
+    const assets: Record<string, number> = {};
+    if (balance.total) {
+      for (const [asset, amount] of Object.entries(balance.total)) {
+        if (typeof amount === 'number' && amount > 0.00001) { // Filter dust
+          assets[asset] = amount;
+        }
+      }
+    }
+
+    // Calculate total in USDT using the same balance object (avoid duplicate API call)
+    const total = await this.getTotalBalanceUSDT(balance);
+
+    return { total, assets };
+  }
+
+  /**
    * Test connection to Binance API
    */
   async testConnection(): Promise<{ success: boolean; message: string }> {
