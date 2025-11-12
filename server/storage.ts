@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, type AIDecision, trades, portfolioSettings, users, apiKeys } from "@shared/schema";
+import { type User, type InsertUser, type Trade, type Portfolio, type BotState, type StrategyType, type TradingMode, type AIDecision, type Position, trades, portfolioSettings, users, apiKeys, positions } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -35,6 +35,12 @@ export interface IStorage {
   getBotState(): Promise<BotState>;
   updateBotState(state: Partial<BotState>): Promise<BotState>;
   clearTrades(): Promise<void>;
+  
+  // Position methods (stop-loss/take-profit tracking)
+  getOpenPositions(mode?: TradingMode): Promise<Position[]>;
+  addPosition(position: Position): Promise<Position>;
+  closePosition(id: string, closedAt: number): Promise<Position | undefined>;
+  getPosition(id: string): Promise<Position | undefined>;
   
   // Trading mode methods
   getTradingMode(): Promise<TradingModeSettings>;
@@ -248,6 +254,81 @@ export class DatabaseStorage implements IStorage {
 
   async clearTrades(): Promise<void> {
     await db.delete(trades);
+  }
+
+  // Position methods (stop-loss/take-profit tracking)
+  async getOpenPositions(mode?: TradingMode): Promise<Position[]> {
+    const conditions = [sql`${positions.closedAt} IS NULL`];
+    
+    if (mode) {
+      conditions.push(eq(positions.mode, mode));
+    }
+    
+    const rows = await db.select().from(positions).where(and(...conditions));
+    
+    return rows.map(row => ({
+      id: row.id,
+      symbol: row.symbol,
+      side: row.side as 'LONG' | 'SHORT',
+      entryPrice: parseFloat(row.entryPrice),
+      quantity: parseFloat(row.quantity),
+      stopLoss: parseFloat(row.stopLoss),
+      takeProfit: parseFloat(row.takeProfit),
+      trailingStop: row.trailingStop ? parseFloat(row.trailingStop) : undefined,
+      mode: row.mode as TradingMode,
+      strategy: row.strategy as StrategyType,
+      openedAt: row.openedAt.getTime(),
+      closedAt: row.closedAt ? row.closedAt.getTime() : undefined,
+    }));
+  }
+
+  async addPosition(position: Position): Promise<Position> {
+    await db.insert(positions).values({
+      id: position.id,
+      symbol: position.symbol,
+      side: position.side,
+      entryPrice: position.entryPrice.toString(),
+      quantity: position.quantity.toString(),
+      stopLoss: position.stopLoss.toString(),
+      takeProfit: position.takeProfit.toString(),
+      trailingStop: position.trailingStop?.toString(),
+      mode: position.mode,
+      strategy: position.strategy,
+      openedAt: new Date(position.openedAt),
+    });
+    
+    return position;
+  }
+
+  async closePosition(id: string, closedAt: number): Promise<Position | undefined> {
+    await db.update(positions)
+      .set({ closedAt: new Date(closedAt) })
+      .where(eq(positions.id, id));
+    
+    return this.getPosition(id);
+  }
+
+  async getPosition(id: string): Promise<Position | undefined> {
+    const [row] = await db.select().from(positions).where(eq(positions.id, id));
+    
+    if (!row) {
+      return undefined;
+    }
+    
+    return {
+      id: row.id,
+      symbol: row.symbol,
+      side: row.side as 'LONG' | 'SHORT',
+      entryPrice: parseFloat(row.entryPrice),
+      quantity: parseFloat(row.quantity),
+      stopLoss: parseFloat(row.stopLoss),
+      takeProfit: parseFloat(row.takeProfit),
+      trailingStop: row.trailingStop ? parseFloat(row.trailingStop) : undefined,
+      mode: row.mode as TradingMode,
+      strategy: row.strategy as StrategyType,
+      openedAt: row.openedAt.getTime(),
+      closedAt: row.closedAt ? row.closedAt.getTime() : undefined,
+    };
   }
 
   // AI Decision methods

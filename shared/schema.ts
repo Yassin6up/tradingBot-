@@ -55,6 +55,26 @@ export const insertTradeSchema = createInsertSchema(trades);
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type TradeRow = typeof trades.$inferSelect;
 
+// Positions table (for tracking open positions with stop-loss/take-profit)
+export const positions = sqliteTable("positions", {
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  side: text("side").notNull(), // 'LONG' or 'SHORT'
+  entryPrice: text("entry_price").notNull(), // Store as string to maintain precision
+  quantity: text("quantity").notNull(), // Store as string to maintain precision
+  stopLoss: text("stop_loss").notNull(), // Stop-loss price
+  takeProfit: text("take_profit").notNull(), // Take-profit price
+  trailingStop: text("trailing_stop"), // Optional trailing stop price
+  mode: text("mode").notNull(), // 'paper' or 'real'
+  strategy: text("strategy").notNull(), // 'safe', 'balanced', 'aggressive'
+  openedAt: integer("opened_at", { mode: 'timestamp' }).notNull(),
+  closedAt: integer("closed_at", { mode: 'timestamp' }), // null if still open
+});
+
+export const insertPositionSchema = createInsertSchema(positions).omit({ closedAt: true });
+export type InsertPosition = z.infer<typeof insertPositionSchema>;
+export type PositionRow = typeof positions.$inferSelect;
+
 // Portfolio settings table (single row)
 export const portfolioSettings = sqliteTable("portfolio_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -103,6 +123,21 @@ export interface Trade {
   profitPercent: number;
   strategy: StrategyType;
   mode: TradingMode;
+}
+
+export interface Position {
+  id: string;
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  entryPrice: number;
+  quantity: number;
+  stopLoss: number;
+  takeProfit: number;
+  trailingStop?: number;
+  mode: TradingMode;
+  strategy: StrategyType;
+  openedAt: number;
+  closedAt?: number;
 }
 
 export interface Portfolio {

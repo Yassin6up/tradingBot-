@@ -13,22 +13,22 @@ interface StrategyConfig {
 
 const strategies: Record<StrategyType, StrategyConfig> = {
   safe: {
-    riskPerTrade: 0.015,
-    profitTarget: 0.035,
-    minProfit: 0.02,
-    maxProfit: 0.04,
+    riskPerTrade: 0.01,     // 1% max risk per trade (VERY SAFE - only $1.19 at risk with $119 balance)
+    profitTarget: 0.02,     // 2% profit target (realistic and achievable)
+    minProfit: 0.015,       // 1.5% minimum profit before taking profit
+    maxProfit: 0.03,        // 3% maximum profit target
   },
   balanced: {
-    riskPerTrade: 0.025,
-    profitTarget: 0.055,
-    minProfit: 0.03,
-    maxProfit: 0.07,
+    riskPerTrade: 0.02,     // 2% max risk per trade (only $2.38 at risk with $119)
+    profitTarget: 0.04,     // 4% profit target
+    minProfit: 0.025,       // 2.5% minimum profit
+    maxProfit: 0.05,        // 5% maximum profit
   },
   aggressive: {
-    riskPerTrade: 0.04,
-    profitTarget: 0.085,
-    minProfit: 0.05,
-    maxProfit: 0.12,
+    riskPerTrade: 0.03,     // 3% max risk per trade (only $3.57 at risk with $119)
+    profitTarget: 0.06,     // 6% profit target
+    minProfit: 0.04,        // 4% minimum profit
+    maxProfit: 0.08,        // 8% maximum profit
   },
 };
 
@@ -411,15 +411,15 @@ class TradingEngine {
       console.log(`   Max risk amount (${(config.riskPerTrade * 100).toFixed(1)}% of balance): $${(realBalance * config.riskPerTrade).toFixed(2)}`);
       console.log(`   Final trade amount: $${tradeAmount.toFixed(2)}`);
 
-      // Safety check: minimum trade amount
-      if (tradeAmount < 10) {
+      // Safety check: minimum trade amount (lowered to $5 for small accounts)
+      if (tradeAmount < 5) {
         console.warn(`⚠️ TRADE SKIPPED: Trade amount too small`);
         console.warn(`   Trade amount: $${tradeAmount.toFixed(2)}`);
-        console.warn(`   Minimum required: $10.00`);
+        console.warn(`   Minimum required: $5.00`);
         console.warn(`   → Increase your balance or adjust risk settings`);
         return;
       }
-      console.log('✅ Trade amount meets minimum requirement ($10)');
+      console.log('✅ Trade amount meets minimum requirement ($5)');
 
       let order: any;
       let quantity: number;
