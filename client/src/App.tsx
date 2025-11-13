@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
+import AILogs from "@/pages/ai-logs";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import "./i18n/config"; // Initialize i18n
@@ -14,6 +15,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/ai-logs" component={AILogs} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

@@ -245,10 +245,17 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
                         <span className="tabular-nums" data-testid={`text-trade-price-${index}`}>
                           {formatPrice(trade.price)}
                         </span>
-                        <span>•</span>
-                        <span data-testid={`text-trade-time-${index}`}>
-                          {formatDate(trade.timestamp)} {formatTime(trade.timestamp)}
+                        <span>×</span>
+                        <span className="tabular-nums">
+                          {trade.quantity.toFixed(6)}
                         </span>
+                        <span>=</span>
+                        <span className="tabular-nums font-semibold">
+                          ${(trade.price * trade.quantity).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-trade-time-${index}`}>
+                        {formatDate(trade.timestamp)} {formatTime(trade.timestamp)}
                       </div>
                     </div>
                   </div>

@@ -7,6 +7,11 @@ import { randomUUID } from "crypto";
 export class StrategyAI {
   private priceHistory: Map<string, PriceData[]> = new Map();
   private readonly HISTORY_SIZE = 100;
+  // ENHANCED: Multi-timeframe data (5m, 15m, 30m, 1h)
+  private priceHistory5m: Map<string, PriceData[]> = new Map();
+  private priceHistory15m: Map<string, PriceData[]> = new Map();
+  private priceHistory30m: Map<string, PriceData[]> = new Map();
+  private priceHistory1h: Map<string, PriceData[]> = new Map();
   private aiDecisionHistory: AIDecision[] = [];
   private strategyPerformance = new Map<string, { wins: number; losses: number; totalProfit: number }>();
   private newsCache: Map<string, { sentiment: number; relevance: number; timestamp: number }> = new Map();
@@ -14,6 +19,7 @@ export class StrategyAI {
   private readonly NEWS_UPDATE_INTERVAL = 300000; // 5 minutes
   private lastStrategyRotation: number = 0;
   private readonly STRATEGY_ROTATION_INTERVAL = 900000; // 15 minutes
+  private decisionLogs: any[] = []; // Store detailed decision logs for UI
 
   public updatePriceData(priceData: PriceData[]) {
     priceData.forEach(data => {
@@ -27,10 +33,137 @@ export class StrategyAI {
       if (history.length > this.HISTORY_SIZE) {
         history.shift();
       }
+      
+      // ENHANCED: Update multi-timeframe data
+      this.updateMultiTimeframeData(data);
     });
 
     // Update news periodically
     this.updateNewsData();
+  }
+
+  /**
+   * ENHANCED: Multi-timeframe analysis (5m, 15m, 30m, 1h)
+   * This gives AI a better understanding of the market across different time horizons
+   */
+  private updateMultiTimeframeData(data: PriceData) {
+    const now = Date.now();
+    
+    // 5-minute candles
+    if (!this.priceHistory5m.has(data.symbol)) {
+      this.priceHistory5m.set(data.symbol, []);
+    }
+    const history5m = this.priceHistory5m.get(data.symbol)!;
+    if (history5m.length === 0 || now - history5m[history5m.length - 1].timestamp >= 300000) {
+      history5m.push(data);
+      if (history5m.length > 30) history5m.shift(); // Keep 30 candles (2.5 hours)
+    }
+    
+    // 15-minute candles
+    if (!this.priceHistory15m.has(data.symbol)) {
+      this.priceHistory15m.set(data.symbol, []);
+    }
+    const history15m = this.priceHistory15m.get(data.symbol)!;
+    if (history15m.length === 0 || now - history15m[history15m.length - 1].timestamp >= 900000) {
+      history15m.push(data);
+      if (history15m.length > 20) history15m.shift(); // Keep 20 candles (5 hours)
+    }
+    
+    // 30-minute candles
+    if (!this.priceHistory30m.has(data.symbol)) {
+      this.priceHistory30m.set(data.symbol, []);
+    }
+    const history30m = this.priceHistory30m.get(data.symbol)!;
+    if (history30m.length === 0 || now - history30m[history30m.length - 1].timestamp >= 1800000) {
+      history30m.push(data);
+      if (history30m.length > 12) history30m.shift(); // Keep 12 candles (6 hours)
+    }
+    
+    // 1-hour candles
+    if (!this.priceHistory1h.has(data.symbol)) {
+      this.priceHistory1h.set(data.symbol, []);
+    }
+    const history1h = this.priceHistory1h.get(data.symbol)!;
+    if (history1h.length === 0 || now - history1h[history1h.length - 1].timestamp >= 3600000) {
+      history1h.push(data);
+      if (history1h.length > 24) history1h.shift(); // Keep 24 candles (24 hours)
+    }
+  }
+
+  /**
+   * ENHANCED: Multi-timeframe comprehensive metrics
+   * Analyzes 5m, 15m, 30m, and 1h timeframes for better decision making
+   */
+  private calculateMultiTimeframeMetrics(symbol: string) {
+    const tf5m = this.priceHistory5m.get(symbol) || [];
+    const tf15m = this.priceHistory15m.get(symbol) || [];
+    const tf30m = this.priceHistory30m.get(symbol) || [];
+    const tf1h = this.priceHistory1h.get(symbol) || [];
+    
+    // Calculate metrics for each timeframe
+    const metrics5m = tf5m.length >= 10 ? this.calculateComprehensiveMetrics(tf5m) : null;
+    const metrics15m = tf15m.length >= 10 ? this.calculateComprehensiveMetrics(tf15m) : null;
+    const metrics30m = tf30m.length >= 10 ? this.calculateComprehensiveMetrics(tf30m) : null;
+    const metrics1h = tf1h.length >= 10 ? this.calculateComprehensiveMetrics(tf1h) : null;
+    
+    // Calculate trend alignment across timeframes
+    const trendAlignment = this.calculateTrendAlignment(
+      metrics5m?.trendStrength || 0,
+      metrics15m?.trendStrength || 0,
+      metrics30m?.trendStrength || 0,
+      metrics1h?.trendStrength || 0
+    );
+    
+    // Calculate momentum alignment
+    const momentumAlignment = this.calculateMomentumAlignment(
+      metrics5m?.momentum || 0,
+      metrics15m?.momentum || 0,
+      metrics30m?.momentum || 0,
+      metrics1h?.momentum || 0
+    );
+    
+    return {
+      tf5m: metrics5m,
+      tf15m: metrics15m,
+      tf30m: metrics30m,
+      tf1h: metrics1h,
+      trendAlignment,
+      momentumAlignment,
+      strongSignal: trendAlignment > 0.7 && momentumAlignment > 0.6
+    };
+  }
+
+  /**
+   * Calculate trend alignment across multiple timeframes
+   * Returns a score 0-1 where 1 means all timeframes agree on direction
+   */
+  private calculateTrendAlignment(...trends: number[]): number {
+    if (trends.length === 0) return 0;
+    
+    const bullish = trends.filter(t => t > 5).length;
+    const bearish = trends.filter(t => t < -5).length;
+    const neutral = trends.filter(t => Math.abs(t) <= 5).length;
+    
+    const total = trends.length;
+    const maxAlignment = Math.max(bullish, bearish, neutral);
+    
+    return maxAlignment / total;
+  }
+
+  /**
+   * Calculate momentum alignment across multiple timeframes
+   */
+  private calculateMomentumAlignment(...momentums: number[]): number {
+    if (momentums.length === 0) return 0;
+    
+    const positive = momentums.filter(m => m > 3).length;
+    const negative = momentums.filter(m => m < -3).length;
+    const neutral = momentums.filter(m => Math.abs(m) <= 3).length;
+    
+    const total = momentums.length;
+    const maxAlignment = Math.max(positive, negative, neutral);
+    
+    return maxAlignment / total;
   }
 
   /**
