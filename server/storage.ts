@@ -41,6 +41,7 @@ export interface IStorage {
   addPosition(position: Position): Promise<Position>;
   closePosition(id: string, closedAt: number): Promise<Position | undefined>;
   getPosition(id: string): Promise<Position | undefined>;
+  updatePositionStopLoss(id: string, stopLoss: number): Promise<void>; // ADDED METHOD
   
   // Trading mode methods
   getTradingMode(): Promise<TradingModeSettings>;
@@ -179,51 +180,76 @@ export class DatabaseStorage implements IStorage {
     return trade;
   }
 
-  async getPortfolio(): Promise<Portfolio> {
+async getPortfolio(): Promise<Portfolio> {
     // Get all trades to calculate portfolio stats
     const allTrades = await this.getTrades();
     
     // Get initial balance from settings
     const [settings] = await db.select().from(portfolioSettings).limit(1);
-    const initialBalance = settings ? parseFloat(settings.initialBalance) : 10000;
+    const initialBalance = settings ? parseFloat(settings.initialBalance) : 500;
     
-    // Calculate portfolio metrics
-    const totalProfit = allTrades.reduce((sum, t) => sum + t.profit, 0);
+    // Calculate portfolio metrics with NaN protection
+    const totalProfit = allTrades.reduce((sum, t) => {
+      const profit = isNaN(t.profit) ? 0 : t.profit;
+      return sum + profit;
+    }, 0);
+    
     const balance = initialBalance + totalProfit;
-    const winningTrades = allTrades.filter(t => t.profit > 0).length;
-    const losingTrades = allTrades.filter(t => t.profit < 0).length;
+
+    // Calculate win rate with NaN protection
+    const winningTrades = allTrades.filter(t => {
+      const profit = isNaN(t.profit) ? 0 : t.profit;
+      return profit > 0;
+    }).length;
+    
+    const losingTrades = allTrades.filter(t => {
+      const profit = isNaN(t.profit) ? 0 : t.profit;
+      return profit < 0;
+    }).length;
+    
     const winRate = allTrades.length > 0 ? (winningTrades / allTrades.length) * 100 : 0;
-    
-    // Calculate daily profit (trades from last 24 hours)
+
+    // Calculate daily profit (trades from last 24 hours) with NaN protection
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    const dailyTrades = allTrades.filter(t => t.timestamp >= oneDayAgo);
-    const dailyProfit = dailyTrades.reduce((sum, t) => sum + t.profit, 0);
+    const dailyProfit = allTrades.reduce((sum, t) => {
+      if (t.timestamp >= oneDayAgo) {
+        const profit = isNaN(t.profit) ? 0 : t.profit;
+        return sum + profit;
+      }
+      return sum;
+    }, 0);
     
-    // Find best performing coin
+    // Find best performing coin with NaN protection
     const coinProfits = new Map<string, number>();
     allTrades.forEach(t => {
+      const profit = isNaN(t.profit) ? 0 : t.profit;
       const current = coinProfits.get(t.symbol) || 0;
-      coinProfits.set(t.symbol, current + t.profit);
+      coinProfits.set(t.symbol, current + profit);
     });
     
     let bestPerformingCoin = 'BTC/USDT';
     let maxProfit = -Infinity;
     coinProfits.forEach((profit, symbol) => {
-      if (profit > maxProfit) {
-        maxProfit = profit;
+      const safeProfit = isNaN(profit) ? 0 : profit;
+      if (safeProfit > maxProfit) {
+        maxProfit = safeProfit;
         bestPerformingCoin = symbol;
       }
     });
+
+    // Calculate percentages with division protection
+    const totalProfitPercent = initialBalance !== 0 ? (totalProfit / initialBalance) * 100 : 0;
+    const dailyProfitPercent = initialBalance !== 0 ? (dailyProfit / initialBalance) * 100 : 0;
     
     return {
-      balance,
-      initialBalance,
-      totalProfit,
-      totalProfitPercent: (totalProfit / initialBalance) * 100,
-      dailyProfit,
-      dailyProfitPercent: (dailyProfit / initialBalance) * 100,
+      balance: isNaN(balance) ? initialBalance : balance,
+      initialBalance: isNaN(initialBalance) ? 500 : initialBalance,
+      totalProfit: isNaN(totalProfit) ? 0 : totalProfit,
+      totalProfitPercent: isNaN(totalProfitPercent) ? 0 : totalProfitPercent,
+      dailyProfit: isNaN(dailyProfit) ? 0 : dailyProfit,
+      dailyProfitPercent: isNaN(dailyProfitPercent) ? 0 : dailyProfitPercent,
       openPositions: 0, // Not tracking open positions in this implementation
-      winRate,
+      winRate: isNaN(winRate) ? 0 : winRate,
       totalTrades: allTrades.length,
       winningTrades,
       losingTrades,
@@ -329,6 +355,29 @@ export class DatabaseStorage implements IStorage {
       openedAt: row.openedAt.getTime(),
       closedAt: row.closedAt ? row.closedAt.getTime() : undefined,
     };
+  }
+
+  /**
+   * Update stop-loss for a position
+   */
+  async updatePositionStopLoss(id: string, stopLoss: number): Promise<void> {
+    try {
+      const result = await db.update(positions)
+        .set({ 
+          stopLoss: stopLoss.toString()
+        })
+        .where(eq(positions.id, id));
+
+      if (!result.changes || result.changes === 0) {
+        console.warn(`⚠️ No position found with ID: ${id} to update stop-loss`);
+        return;
+      }
+
+      console.log(`💾 Stop-loss updated for position ${id}: $${stopLoss.toFixed(2)}`);
+    } catch (error) {
+      console.error(`❌ Failed to update stop-loss for position ${id}:`, error);
+      throw new Error(`Failed to update stop-loss: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   // AI Decision methods
@@ -504,6 +553,41 @@ export class DatabaseStorage implements IStorage {
       console.error('Failed to delete API keys:', error);
       throw new Error('Failed to delete API credentials');
     }
+  }
+
+  async resetStorage(): Promise<void> {
+    // Clear trades
+    await this.clearTrades();
+    
+    // Reset portfolio settings
+    await db.update(portfolioSettings)
+      .set({
+        initialBalance: '500',
+        realBalance: null,
+        realBalanceUpdatedAt: null,
+        tradingMode: 'paper',
+        realModeConfirmedAt: null,
+        realModeEnabledBy: null,
+        maxPositionSize: '1000',
+        dailyLossLimit: '500',
+      })
+      .where(eq(portfolioSettings.id, 1));
+    
+    // Clear positions
+    await db.delete(positions);
+    
+    // Reset bot state
+    this.botState = {
+      status: 'stopped',
+      strategy: 'balanced',
+      mode: 'paper',
+      startTime: null,
+      uptime: 0,
+      aiEnabled: false,
+    };
+    
+    // Clear AI decisions
+    this.aiDecisions = [];
   }
 }
 

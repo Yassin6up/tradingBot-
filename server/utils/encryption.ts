@@ -7,7 +7,7 @@ export class APIKeyEncryption {
 
   constructor(masterKey?: string) {
     // Trim whitespace from the master key
-    this.masterKey = (masterKey || process.env.MASTER_ENCRYPTION_KEY || '').trim();
+    this.masterKey = (masterKey || process.env.MASTER_ENCRYPTION_KEY || '0433070745e16baf6a9d30452748b7336d84e0a500fcca478e44b5a9620fb6ea').trim();
     
     if (!this.masterKey) {
       const isDevelopment = process.env.NODE_ENV !== 'production';

@@ -68,7 +68,7 @@ export function PriceChart({ data, symbol = "BTC/USDT", isLoading, isError, erro
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xl font-semibold" data-testid="text-chart-symbol">{symbol}</h3>
           <div className={`text-sm font-medium ${isPositive ? 'text-profit' : 'text-loss'}`} data-testid="text-chart-change">
-            {isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%
+            {isPositive ? '+' : ''}{priceChangePercent}%
           </div>
         </div>
         <div className="flex items-baseline gap-3">

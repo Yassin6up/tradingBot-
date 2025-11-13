@@ -136,7 +136,7 @@ export function CoinPriceSlider() {
                     <TrendingDown className="h-4 w-4" />
                   )}
                   <span className="text-sm font-medium">
-                    {Math.abs(priceChange).toFixed(2)}
+                    {Math.abs(priceChange)}
                   </span>
                 </motion.div>
               )}

@@ -65,7 +65,6 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
       const encodedSymbol = encodeURIComponent(symbol);
       const url = `/api/chart/${encodedSymbol}?timeframe=${timeframe}&indicators=${activeIndicators.join(',')}`;
       
-      console.log('📡 Fetching chart data from:', url);
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -73,7 +72,6 @@ export function AdvancedChart({ symbol = 'BTC/USDT', defaultTimeframe = '5m' }: 
       }
       
       const result = await response.json();
-      console.log('✅ Chart data received:', result);
       
       return result;
     },

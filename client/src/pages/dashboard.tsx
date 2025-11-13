@@ -9,10 +9,19 @@ import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { CoinSelector } from "@/components/coin-selector";
 import { CoinPriceSlider } from "@/components/coin-price-slider";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
-import { Wallet, TrendingUp, Activity, Target } from "lucide-react";
+import { 
+  Wallet, 
+  TrendingUp, 
+  Activity, 
+  Target, 
+  BarChart3, 
+  Trophy,
+  Calendar,
+  PieChart
+} from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Portfolio, BotState, Trade, StrategyType, TradingMode, AIDecision } from "@shared/schema";
 
@@ -30,13 +39,12 @@ export default function Dashboard() {
     refetchInterval: 2000,
   });
 
+  console.log('Portfolio Data:', portfolio);
   // Fetch bot state
   const { data: botState, isLoading: botLoading } = useQuery<BotState>({
     queryKey: ['/api/bot/status'],
     refetchInterval: 1000,
   });
-
-  // Fetch trades
   const { data: trades = [], isLoading: tradesLoading } = useQuery<Trade[]>({
     queryKey: ['/api/trades'],
     refetchInterval: 2000,
@@ -199,7 +207,7 @@ export default function Dashboard() {
       const isProfit = trade.profit >= 0;
       toast({
         title: `${trade.type} ${trade.symbol}`,
-        description: `${isProfit ? 'Profit' : 'Loss'}: ${isProfit ? '+' : ''}$${trade.profit.toFixed(2)} (${isProfit ? '+' : ''}${trade.profitPercent.toFixed(2)}%)`,
+        description: `${isProfit ? 'Profit' : 'Loss'}: ${isProfit ? '+' : ''}$${trade.profit?.toFixed(2)} (${isProfit ? '+' : ''}${trade.profitPercent?.toFixed(2)}%)`,
         variant: isProfit ? "default" : "destructive",
       });
     });
@@ -274,12 +282,19 @@ export default function Dashboard() {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: value < 1 ? 5 : 2,
     }).format(value);
   };
 
   const formatPercent = (value: number) => {
-    return `${value.toFixed(1)}%`;
+    return `${value >= 0 ? '+' : ''}${value?.toFixed(2)}%`;
+  };
+
+  const formatUptime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -303,7 +318,7 @@ export default function Dashboard() {
                 </p>
               </div>
               <div className={`h-3 w-3 rounded-full ${
-                botState?.status === 'running' ? 'bg-profit animate-pulse' : 'bg-muted-foreground'
+                botState?.status === 'running' ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'
               }`} data-testid="indicator-header-bot-status"></div>
             </div>
           </div>
@@ -313,7 +328,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-6">
-        {/* Stats Grid */}
+        {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
             title={portfolio?.realMode ? t('dashboard.realBalance') || 'Real Balance' : t('dashboard.balance')}
@@ -325,7 +340,7 @@ export default function Dashboard() {
             data-testid="stat-balance"
           />
           <StatCard
-            title={t('dashboard.profit')}
+            title={t('dashboard.profit') || "Daily Profit"}
             value={portfolio ? formatCurrency(portfolio.dailyProfit) : '$0.00'}
             change={portfolio?.dailyProfit}
             changePercent={portfolio?.dailyProfitPercent}
@@ -333,19 +348,227 @@ export default function Dashboard() {
             isLoading={portfolioLoading}
           />
           <StatCard
-            title={t('dashboard.trades')}
-            value={portfolio?.openPositions.toString() || '0'}
+            title={t('dashboard.trades') || "Open Positions"}
+            value={portfolio?.openPositions?.toString() || '0'}
+            subtitle={`Total: ${portfolio?.totalTrades || 0}`}
             icon={<Activity className="h-4 w-4" />}
             isLoading={portfolioLoading}
           />
           <StatCard
-            title={t('dashboard.winRate')}
+            title={t('dashboard.winRate') || "Win Rate"}
             value={portfolio ? formatPercent(portfolio.winRate) : '0.0%'}
-            change={portfolio?.winningTrades}
+            subtitle={`${portfolio?.winningTrades || 0}W / ${portfolio?.losingTrades || 0}L`}
             icon={<Target className="h-4 w-4" />}
             isLoading={portfolioLoading}
           />
         </div>
+
+        {/* Detailed Portfolio Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {/* Total Profit Card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Profit/Loss</p>
+                  <p className={`text-2xl font-bold ${(portfolio?.totalProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {portfolio ? formatCurrency(portfolio.totalProfit) : '$0.00'}
+                  </p>
+                  <p className={`text-sm ${(portfolio?.totalProfitPercent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {portfolio ? formatPercent(portfolio.totalProfitPercent) : '0.00%'}
+                  </p>
+                </div>
+                <TrendingUp className={`h-8 w-8 ${(portfolio?.totalProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Initial Balance Card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Initial Balance</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {portfolio ? formatCurrency(portfolio.initialBalance) : '$0.00'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Starting Capital</p>
+                </div>
+                <Wallet className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Trade Performance Card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Trade Performance</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {portfolio?.totalTrades || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {portfolio?.winningTrades || 0} Wins • {portfolio?.losingTrades || 0} Losses
+                  </p>
+                </div>
+                <BarChart3 className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Performance Summary Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Best Performing Coin */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                Best Performing Coin
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {portfolio?.bestPerformingCoin ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Coin</span>
+                    <span className="text-lg font-bold text-foreground bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+                      {portfolio.bestPerformingCoin}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">Performance</span>
+                    <span className="text-lg font-bold text-green-600">
+                      Top Performer
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground">No performance data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Trading Information */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Activity className="h-5 w-5 text-blue-500" />
+                Trading Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Trading Mode</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    portfolio?.realMode 
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' 
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                  }`}>
+                    {portfolio?.realMode ? 'REAL' : 'PAPER'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Win Rate</span>
+                  <span className={`text-sm font-bold ${(portfolio?.winRate || 0) >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+                    {portfolio ? formatPercent(portfolio.winRate) : '0.00%'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Total Trades</span>
+                  <span className="text-sm font-bold">{portfolio?.totalTrades || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Profit/Loss Ratio</span>
+                  <span className="text-sm font-bold">
+                    {portfolio?.winningTrades || 0}:{portfolio?.losingTrades || 0}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Detailed Performance Breakdown */}
+        {/* <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5" />
+              Performance Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 rounded-lg bg-muted/30 border border-border">
+                <p className="text-2xl font-bold text-foreground">{portfolio?.totalTrades || 0}</p>
+                <p className="text-xs text-muted-foreground">Total Trades</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <p className="text-2xl font-bold text-green-600">{portfolio?.winningTrades || 0}</p>
+                <p className="text-xs text-muted-foreground">Winning Trades</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                <p className="text-2xl font-bold text-red-600">{portfolio?.losingTrades || 0}</p>
+                <p className="text-xs text-muted-foreground">Losing Trades</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-2xl font-bold text-blue-600">
+                  {portfolio ? formatPercent(portfolio.winRate) : '0.00%'}
+                </p>
+                <p className="text-xs text-muted-foreground">Win Rate</p>
+              </div>
+            </div>
+            
+            <div className="mt-6 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Performance Progress</span>
+                <span className="font-medium">{portfolio ? portfolio.winRate.toFixed(1) : '0'}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(portfolio?.winRate || 0, 100)}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card> */}
+
+        {/* Bot Uptime & Status */}
+        {botState?.status === 'running' && (
+          <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse"></div>
+                  <div>
+                    <p className="font-semibold text-green-800 dark:text-green-300">Bot is Running</p>
+                    <p className="text-sm text-muted-foreground">
+                      Strategy: <span className="font-medium">{botState.strategy}</span> • 
+                      Mode: <span className="font-medium">{botState.mode}</span> • 
+                      Uptime: <span className="font-medium">{formatUptime(uptime)}</span>
+                    </p>
+                  </div>
+                </div>
+                {botState.aiEnabled && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900 rounded-full">
+                    <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse"></div>
+                    <span className="text-xs font-medium text-purple-800 dark:text-purple-300">AI Enabled</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Animated Coin Price Slider */}
         <div className="mb-6">
@@ -378,7 +601,7 @@ export default function Dashboard() {
                 .map(([asset, amount]) => (
                   <div key={asset} className="p-3 rounded-md bg-muted/30 border border-border" data-testid={`asset-${asset}`}>
                     <div className="text-xs text-muted-foreground font-medium mb-1">{asset}</div>
-                    <div className="text-sm font-bold tabular-nums">{amount.toFixed(8)}</div>
+                    <div className="text-sm font-bold tabular-nums">{amount}</div>
                   </div>
                 ))}
             </div>

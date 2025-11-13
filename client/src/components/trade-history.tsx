@@ -105,8 +105,8 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
     }).format(price);
   };
 
@@ -259,7 +259,7 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
                       {isProfit ? '+' : ''}{formatPrice(trade.profit)}
                     </div>
                     <div className={`text-xs ${isProfit ? 'text-profit' : 'text-loss'}`}>
-                      {isProfit ? '+' : ''}{trade.profitPercent.toFixed(2)}%
+                      {isProfit ? '+' : ''}{trade.profitPercent}%
                     </div>
                   </div>
                 </div>

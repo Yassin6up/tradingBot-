@@ -37,6 +37,7 @@ export class BinanceService {
 
       // Use testnet if configured
       if (this.config.testnet) {
+        console.log("================== USING BINANCE TESTNET ==================");
         this.exchange.setSandboxMode(true);
       }
 
@@ -246,7 +247,7 @@ export class BinanceService {
       
       return {
         success: true,
-        message: `Connected successfully. BTC/USDT price: $${price.toFixed(2)}`,
+        message: `Connected successfully. BTC/USDT price: $${price}`,
       };
     } catch (error) {
       return {
@@ -330,7 +331,7 @@ export class BinanceService {
       // Place market buy order
       const order = await this.exchange.createMarketBuyOrder(symbol, quantity);
       
-      console.log(`✅ BUY order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice.toFixed(2)}`);
+      console.log(`✅ BUY order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice}`);
       return order;
     } catch (error) {
       console.error(`Failed to place BUY order for ${symbol}:`, error instanceof Error ? error.message : error);
@@ -355,7 +356,7 @@ export class BinanceService {
       const order = await this.exchange.createMarketSellOrder(symbol, quantity);
       
       const currentPrice = await this.fetchPrice(symbol);
-      console.log(`✅ SELL order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice.toFixed(2)}`);
+      console.log(`✅ SELL order placed: ${quantity.toFixed(8)} ${symbol} at ~$${currentPrice}`);
       return order;
     } catch (error) {
       console.error(`Failed to place SELL order for ${symbol}:`, error instanceof Error ? error.message : error);

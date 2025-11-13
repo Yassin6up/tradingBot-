@@ -10,7 +10,7 @@ import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader2, DollarSign, AlertTriangle, RefreshCw } from "lucide-react";
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader2, DollarSign, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,7 @@ export default function Settings() {
   const [secret, setSecret] = useState("");
   const [testnet, setTestnet] = useState(false);
   const [showRealModeDialog, setShowRealModeDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
 
   // Query Binance connection status
   const { data: status } = useQuery<{ connected: boolean; message: string }>({
@@ -145,6 +146,34 @@ export default function Settings() {
       });
     },
   });
+
+  // Reset data mutation
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/reset-data', {});
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: t('common.success'),
+        description: data.message || t('settings.resetSuccess'),
+      });
+      // Invalidate all queries to refresh the application state
+      queryClient.invalidateQueries({ queryKey: [] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: error.message || t('settings.resetError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResetData = () => {
+    resetMutation.mutate();
+    setShowResetDialog(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -267,12 +296,12 @@ export default function Settings() {
               {saveMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('settings.saving')}
                 </>
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Save Credentials
+                  {t('settings.saveCredentials')}
                 </>
               )}
             </Button>
@@ -284,14 +313,14 @@ export default function Settings() {
           <Card className="p-6 mb-6" data-testid="card-trading-mode">
             <div className="flex items-center gap-2 mb-6">
               <DollarSign className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">{t('settings.tradingMode') || 'Trading Mode'}</h2>
+              <h2 className="text-lg font-semibold">{t('settings.tradingMode')}</h2>
               {tradingMode && (
                 <Badge
                   variant={tradingMode.mode === 'real' ? "destructive" : "default"}
                   className="ml-auto"
                   data-testid="badge-current-mode"
                 >
-                  {tradingMode.mode === 'real' ? '🔴 REAL MONEY' : '📝 Paper Trading'}
+                  {tradingMode.mode === 'real' ? t('settings.realModeBadge') : t('settings.paperModeBadge')}
                 </Badge>
               )}
             </div>
@@ -301,14 +330,14 @@ export default function Settings() {
               <div className="p-4 rounded-md bg-muted/30 border border-border">
                 <p className="text-sm font-medium mb-2">
                   {tradingMode?.mode === 'real' 
-                    ? t('settings.realModeActive') || '🔴 Real Trading Mode Active'
-                    : t('settings.paperModeActive') || '📝 Paper Trading Mode Active'
+                    ? t('settings.realModeActive')
+                    : t('settings.paperModeActive')
                   }
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {tradingMode?.mode === 'real'
-                    ? t('settings.realModeDesc') || 'Your bot is trading with real money from your Binance account. All trades will execute on the live market.'
-                    : t('settings.paperModeDesc') || 'Your bot is simulating trades with virtual money. No real funds are used.'}
+                    ? t('settings.realModeDesc')
+                    : t('settings.paperModeDesc')}
                 </p>
               </div>
 
@@ -316,7 +345,7 @@ export default function Settings() {
               {tradingMode?.mode === 'real' && (
                 <div className="p-4 rounded-md bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium">Real Binance Balance</p>
+                    <p className="text-sm font-medium">{t('settings.realBalance')}</p>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -328,9 +357,9 @@ export default function Settings() {
                   </div>
                   {realBalance ? (
                     <div>
-                      <p className="text-2xl font-bold">${realBalance.total.toFixed(2)} USDT</p>
+                      <p className="text-2xl font-bold">${realBalance.total} USDT</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {Object.keys(realBalance.assets).length} assets
+                        {Object.keys(realBalance.assets).length} {t('settings.assets')}
                       </p>
                     </div>
                   ) : (
@@ -339,7 +368,7 @@ export default function Settings() {
                       onClick={() => refetchBalance()}
                       data-testid="button-fetch-balance"
                     >
-                      Fetch Balance
+                      {t('settings.fetchBalance')}
                     </Button>
                   )}
                 </div>
@@ -357,7 +386,7 @@ export default function Settings() {
                   {switchModeMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  📝 Paper Trading
+                  {t('settings.paperTrading')}
                 </Button>
                 <Button
                   variant={tradingMode?.mode === 'real' ? 'destructive' : 'outline'}
@@ -369,7 +398,7 @@ export default function Settings() {
                   {switchModeMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  🔴 Real Trading
+                  {t('settings.realTrading')}
                 </Button>
               </div>
 
@@ -379,10 +408,10 @@ export default function Settings() {
                   <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
-                      {t('settings.tradingWarning') || 'Trading Risk Warning'}
+                      {t('settings.tradingWarning')}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {t('settings.tradingWarningDesc') || 'Real trading mode will execute actual trades on Binance using your account funds. Only use real mode if you understand the risks and have tested your strategy in paper mode first.'}
+                      {t('settings.tradingWarningDesc')}
                     </p>
                   </div>
                 </div>
@@ -391,46 +420,55 @@ export default function Settings() {
           </Card>
         )}
 
-        {/* Real Mode Confirmation Dialog */}
-        <AlertDialog open={showRealModeDialog} onOpenChange={setShowRealModeDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                {t('settings.confirmRealMode') || 'Confirm Real Trading Mode'}
-              </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-3 text-left">
-                <p className="font-medium text-foreground">
-                  {t('settings.realModeWarning1') || 'You are about to enable REAL MONEY trading. This means:'}
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>{t('settings.realModeWarning2') || 'All trades will execute on the live Binance market'}</li>
-                  <li>{t('settings.realModeWarning3') || 'Real funds from your Binance account will be used'}</li>
-                  <li>{t('settings.realModeWarning4') || 'You can lose money based on market conditions'}</li>
-                  <li>{t('settings.realModeWarning5') || 'Trading fees will apply to all transactions'}</li>
-                </ul>
-                <p className="font-medium text-destructive">
-                  {t('settings.realModeWarning6') || '⚠️ Only proceed if you have tested your strategy thoroughly in paper mode and understand the risks.'}
-                </p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-real-mode">
-                {t('common.cancel') || 'Cancel'}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive hover:bg-destructive/90"
-                onClick={() => {
-                  switchModeMutation.mutate('real');
-                  setShowRealModeDialog(false);
-                }}
-                data-testid="button-confirm-real-mode"
-              >
-                {t('settings.confirmRealModeButton') || 'I Understand, Enable Real Mode'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Data Reset Section */}
+        <Card className="p-6 mb-6 border-destructive/20" data-testid="card-reset-data">
+          <div className="flex items-center gap-2 mb-4">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            <h2 className="text-lg font-semibold text-destructive">{t('settings.resetData')}</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20">
+              <div className="flex gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-destructive mb-2">
+                    {t('settings.resetWarningTitle')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.resetWarningDesc')}
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 list-disc list-inside space-y-1">
+                    <li>{t('settings.resetWarning1')}</li>
+                    <li>{t('settings.resetWarning2')}</li>
+                    <li>{t('settings.resetWarning3')}</li>
+                    <li>{t('settings.resetWarning4')}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              variant="destructive"
+              onClick={() => setShowResetDialog(true)}
+              disabled={resetMutation.isPending}
+              className="w-full"
+              data-testid="button-reset-data"
+            >
+              {resetMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('settings.resetting')}
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('settings.resetDataButton')}
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
 
         {/* Information Card */}
         <Card className="p-6" data-testid="card-api-info">
@@ -454,6 +492,90 @@ export default function Settings() {
             </p>
           </div>
         </Card>
+
+        {/* Real Mode Confirmation Dialog */}
+        <AlertDialog open={showRealModeDialog} onOpenChange={setShowRealModeDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                {t('settings.confirmRealMode')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 text-left">
+                <p className="font-medium text-foreground">
+                  {t('settings.realModeWarning1')}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>{t('settings.realModeWarning2')}</li>
+                  <li>{t('settings.realModeWarning3')}</li>
+                  <li>{t('settings.realModeWarning4')}</li>
+                  <li>{t('settings.realModeWarning5')}</li>
+                </ul>
+                <p className="font-medium text-destructive">
+                  {t('settings.realModeWarning6')}
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-real-mode">
+                {t('common.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={() => {
+                  switchModeMutation.mutate('real');
+                  setShowRealModeDialog(false);
+                }}
+                data-testid="button-confirm-real-mode"
+              >
+                {t('settings.confirmRealModeButton')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reset Data Confirmation Dialog */}
+        <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                {t('settings.confirmResetTitle')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 text-left">
+                <p className="font-medium text-foreground">
+                  {t('settings.confirmResetDesc')}
+                </p>
+                <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm font-medium text-destructive mb-2">
+                    {t('settings.resetIrreversibleWarning')}
+                  </p>
+                  <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                    <li>{t('settings.resetLoss1')}</li>
+                    <li>{t('settings.resetLoss2')}</li>
+                    <li>{t('settings.resetLoss3')}</li>
+                    <li>{t('settings.resetLoss4')}</li>
+                  </ul>
+                </div>
+                <p className="text-sm font-medium text-destructive">
+                  {t('settings.finalConfirmation')}
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-reset">
+                {t('common.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={handleResetData}
+                data-testid="button-confirm-reset"
+              >
+                {t('settings.confirmResetButton')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

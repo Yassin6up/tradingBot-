@@ -7,11 +7,20 @@ interface StatCardProps {
   value: string;
   change?: number;
   changePercent?: number;
+  subtitle?: string;
   icon?: React.ReactNode;
   isLoading?: boolean;
 }
 
-export function StatCard({ title, value, change, changePercent, icon, isLoading }: StatCardProps) {
+export function StatCard({ 
+  title, 
+  value, 
+  change, 
+  changePercent, 
+  subtitle,
+  icon, 
+  isLoading 
+}: StatCardProps) {
   if (isLoading) {
     return (
       <Card className="p-6">
@@ -20,6 +29,7 @@ export function StatCard({ title, value, change, changePercent, icon, isLoading 
           {icon && <Skeleton className="h-4 w-4 rounded-full" />}
         </div>
         <Skeleton className="h-9 w-32 mb-2" />
+        {subtitle && <Skeleton className="h-3 w-20 mb-2" />}
         <Skeleton className="h-3 w-20" />
       </Card>
     );
@@ -31,9 +41,12 @@ export function StatCard({ title, value, change, changePercent, icon, isLoading 
   return (
     <Card className="p-6" data-testid={`card-stat-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-muted-foreground" data-testid={`text-stat-label-${title.toLowerCase().replace(/\s+/g, '-')}`}>{title}</p>
+        <p className="text-sm font-medium text-muted-foreground" data-testid={`text-stat-label-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+          {title}
+        </p>
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </div>
+      
       <div className="space-y-1">
         <h3 
           className="text-3xl font-bold tabular-nums tracking-tight" 
@@ -41,14 +54,29 @@ export function StatCard({ title, value, change, changePercent, icon, isLoading 
         >
           {value}
         </h3>
+        
+        {/* Subtitle */}
+        {subtitle && (
+          <p 
+            className="text-sm text-muted-foreground"
+            data-testid={`text-stat-subtitle-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            {subtitle}
+          </p>
+        )}
+        
+        {/* Change indicator */}
         {hasChange && (
-          <div className={`flex items-center text-sm font-medium gap-1 ${
-            isPositive ? 'text-profit' : 'text-loss'
-          }`} data-testid={`text-stat-change-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+          <div 
+            className={`flex items-center text-sm font-medium gap-1 ${
+              isPositive ? 'text-profit' : 'text-loss'
+            }`} 
+            data-testid={`text-stat-change-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          >
             {isPositive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
             <span className="tabular-nums">
-              {isPositive ? '+' : ''}{change?.toFixed(2)}
-              {changePercent !== undefined && ` (${isPositive ? '+' : ''}${changePercent.toFixed(2)}%)`}
+              {isPositive ? '+' : ''}{change}
+              {changePercent !== undefined && ` (${isPositive ? '+' : ''}${changePercent}%)`}
             </span>
           </div>
         )}

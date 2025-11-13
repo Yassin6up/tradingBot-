@@ -626,8 +626,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error resetting circuit breaker:', error);
       res.status(500).json({ error: 'Failed to reset circuit breaker' });
     }
+
+    
   });
 
+  app.post("/api/reset-data", async (_req, res) => {
+    try {
+      await storage.resetStorage();
+      res.json({ message: 'All data reset successfully' });
+    } catch (error) {
+      console.error('Error resetting data:', error);
+      res.status(500).json({ error: 'Failed to reset data' });
+    }
+  });
+
+  // Create HTTP server
   const httpServer = createServer(app);
 
   // WebSocket server setup on /ws path
