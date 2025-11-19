@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next";
 import { Play, Square, Zap, Brain, TrendingUp, AlertCircle } from "lucide-react";
-import type { BotState, StrategyType, TradingMode, AIDecision } from "@shared/schema";
+import type { BotState, StrategyType, TradingMode, AIDecision } from "@/types";
 
 interface BotControlsProps {
   botState: BotState;
@@ -136,30 +136,51 @@ export function BotControls({ botState, onStart, onStop, onModeChange, onStrateg
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-md">
-          <div className="flex items-center gap-3">
-            <Zap className="h-5 w-5 text-warning" />
-            <div>
-              <Label htmlFor="mode-switch" className="text-sm font-medium cursor-pointer">
-                {t('bot.modeLabel')}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {mode === 'paper' ? t('bot.modes.paperDesc') : t('bot.modes.realDesc')}
-              </p>
-            </div>
-          </div>
+        <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Badge variant={mode === 'paper' ? 'secondary' : 'destructive'} data-testid="badge-trading-mode">
-              {mode === 'paper' ? t('bot.modes.paper') : t('bot.modes.real')}
-            </Badge>
-            <Switch
-              id="mode-switch"
-              checked={mode === 'real'}
-              onCheckedChange={() => onModeChange(mode === 'real' ? 'paper' : 'real')}
-              disabled={isRunning || isLoading}
-              data-testid="switch-trading-mode"
-            />
+            <Zap className="h-5 w-5 text-warning" />
+            <Label className="text-sm font-medium">{t('bot.modeLabel')}</Label>
           </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant={mode === 'simulation' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onModeChange('simulation')}
+              disabled={isRunning || isLoading}
+              data-testid="button-mode-simulation"
+              className="flex flex-col h-auto py-2 px-3"
+            >
+              <span className="font-semibold text-xs">Simulation</span>
+              <span className="text-[10px] text-muted-foreground">Local Testing</span>
+            </Button>
+            <Button
+              variant={mode === 'testnet' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onModeChange('testnet')}
+              disabled={isRunning || isLoading}
+              data-testid="button-mode-testnet"
+              className="flex flex-col h-auto py-2 px-3"
+            >
+              <span className="font-semibold text-xs">Testnet</span>
+              <span className="text-[10px] text-muted-foreground">Paper Trading</span>
+            </Button>
+            <Button
+              variant={mode === 'real' ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={() => onModeChange('real')}
+              disabled={isRunning || isLoading}
+              data-testid="button-mode-real"
+              className="flex flex-col h-auto py-2 px-3"
+            >
+              <span className="font-semibold text-xs">Real</span>
+              <span className="text-[10px] text-muted-foreground">Live Trading</span>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {mode === 'simulation' ? 'Testing with real market data, trades executed locally' : 
+             mode === 'testnet' ? 'Paper trading on Binance testnet' : 
+             'Live trading with real money'}
+          </p>
         </div>
 
         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-md">

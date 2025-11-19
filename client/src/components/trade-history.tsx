@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTranslation } from "react-i18next";
 import { ArrowUpRight, ArrowDownRight, Filter, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Trade, StrategyType } from "@shared/schema";
+import type { Trade, StrategyType } from "@/types";
 import { useState, useMemo } from "react";
 
 interface TradeHistoryProps {
@@ -245,6 +245,14 @@ export function TradeHistory({ trades, isLoading }: TradeHistoryProps) {
                         <span className="tabular-nums" data-testid={`text-trade-price-${index}`}>
                           {formatPrice(trade.price)}
                         </span>
+                        {trade.quantity && (
+                          <>
+                            <span>•</span>
+                            <span className="tabular-nums" data-testid={`text-trade-quantity-${index}`}>
+                              Qty: {trade.quantity.toFixed(6)}
+                            </span>
+                          </>
+                        )}
                         <span>•</span>
                         <span data-testid={`text-trade-time-${index}`}>
                           {formatDate(trade.timestamp)} {formatTime(trade.timestamp)}

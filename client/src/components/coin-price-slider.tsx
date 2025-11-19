@@ -3,12 +3,9 @@ import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface CoinData {
-  symbol: string;
-  price: number;
-  name: string;
-}
+import { useWebSocket } from "@/lib/websocket";
+import { queryClient } from "@/lib/queryClient";
+import type { PriceData } from "@/types";
 
 const COINS = [
   { symbol: 'BTC/USDT', key: 'btc' },
@@ -22,21 +19,28 @@ export function CoinPriceSlider() {
   const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [previousPrices, setPreviousPrices] = useState<Record<string, number>>({});
+  const { subscribe } = useWebSocket();
 
-  // Fetch real-time prices from Binance
-  const { data: prices, isError, error } = useQuery<Record<string, number>>({
+  // Fetch real-time prices
+  const { data: pricesArray } = useQuery<PriceData[]>({
     queryKey: ['/api/prices'],
-    queryFn: async () => {
-      const response = await fetch('/api/prices');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch prices');
-      }
-      return response.json();
-    },
-    refetchInterval: 3000, // Refresh every 3 seconds
-    retry: false, // Don't retry on Binance API requirement error
+    refetchInterval: 3000,
   });
+
+  // Subscribe to WebSocket price updates
+  useEffect(() => {
+    const unsubscribe = subscribe('price_update', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/prices'] });
+    });
+
+    return () => unsubscribe();
+  }, [subscribe]);
+
+  // Convert array to map for easier lookup
+  const prices = pricesArray?.reduce((acc, p) => {
+    acc[p.symbol] = p.price;
+    return acc;
+  }, {} as Record<string, number>);
 
   // Auto-rotate through coins every 3 seconds
   useEffect(() => {
@@ -47,29 +51,20 @@ export function CoinPriceSlider() {
     return () => clearInterval(interval);
   }, []);
 
-  // Track price changes
+  // Track price changes - only update when new prices arrive
   useEffect(() => {
-    if (prices) {
-      setPreviousPrices(prices);
+    if (prices && Object.keys(prices).length > 0) {
+      setPreviousPrices(prev => {
+        const hasChanges = Object.keys(prices).some(symbol => prev[symbol] !== prices[symbol]);
+        if (hasChanges) {
+          return { ...prices };
+        }
+        return prev;
+      });
     }
   }, [prices]);
 
-  if (isError) {
-    return (
-      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
-        <p className="text-sm text-destructive font-medium">
-          {error instanceof Error && error.message.includes('Binance API')
-            ? t('dashboard.binanceRequired')
-            : t('common.error')}
-        </p>
-        <p className="text-xs text-muted-foreground mt-2">
-          {t('dashboard.configureBinance')}
-        </p>
-      </div>
-    );
-  }
-
-  if (!prices) {
+  if (!prices || Object.keys(prices).length === 0) {
     return (
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="animate-pulse space-y-2">
@@ -83,13 +78,12 @@ export function CoinPriceSlider() {
   const currentCoin = COINS[currentIndex];
   const currentPrice = prices[currentCoin.symbol];
   const previousPrice = previousPrices[currentCoin.symbol];
-  const priceChange = previousPrice ? currentPrice - previousPrice : 0;
+  const priceChange = previousPrice && currentPrice ? currentPrice - previousPrice : 0;
   const isUp = priceChange > 0;
   const isDown = priceChange < 0;
 
   return (
     <div className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border border-primary/20 rounded-lg p-6 relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
       
       <div className="relative z-10">
@@ -102,7 +96,6 @@ export function CoinPriceSlider() {
             transition={{ duration: 0.5 }}
             className="space-y-2"
           >
-            {/* Coin name */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground">
                 {t(`coins.${currentCoin.key}`)}
@@ -112,16 +105,14 @@ export function CoinPriceSlider() {
               </span>
             </div>
 
-            {/* Price */}
             <div className="flex items-end gap-3">
-              <span className="text-3xl font-bold tracking-tight">
+              <span className="text-3xl font-bold tracking-tight" data-testid={`price-${currentCoin.symbol}`}>
                 ${currentPrice?.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
               
-              {/* Price change indicator */}
               {(isUp || isDown) && (
                 <motion.div
                   initial={{ scale: 0 }}
@@ -136,13 +127,12 @@ export function CoinPriceSlider() {
                     <TrendingDown className="h-4 w-4" />
                   )}
                   <span className="text-sm font-medium">
-                    {Math.abs(priceChange)}
+                    {Math.abs(priceChange).toFixed(2)}
                   </span>
                 </motion.div>
               )}
             </div>
 
-            {/* Progress dots */}
             <div className="flex gap-1.5 pt-2">
               {COINS.map((_, index) => (
                 <div

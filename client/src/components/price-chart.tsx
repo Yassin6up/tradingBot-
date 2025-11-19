@@ -3,7 +3,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianG
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "react-i18next";
 import { AlertCircle } from "lucide-react";
-import type { ChartDataPoint } from "@shared/schema";
+import type { ChartDataPoint } from "@/types";
 
 interface PriceChartProps {
   data: ChartDataPoint[];

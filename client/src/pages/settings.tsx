@@ -40,7 +40,6 @@ export default function Settings() {
   // Query trading mode
   const { data: tradingMode } = useQuery<{ mode: string; realBalance?: number }>({
     queryKey: ['/api/trading-mode'],
-    enabled: status?.connected ?? false,
   });
 
   // Query real balance
@@ -320,7 +319,7 @@ export default function Settings() {
                   className="ml-auto"
                   data-testid="badge-current-mode"
                 >
-                  {tradingMode.mode === 'real' ? t('settings.realModeBadge') : t('settings.paperModeBadge')}
+                  {tradingMode.mode === 'simulation' ? 'Simulation Mode' : tradingMode.mode === 'real' ? t('settings.realModeBadge') : t('settings.testnetModeBadge')}
                 </Badge>
               )}
             </div>
@@ -331,13 +330,13 @@ export default function Settings() {
                 <p className="text-sm font-medium mb-2">
                   {tradingMode?.mode === 'real' 
                     ? t('settings.realModeActive')
-                    : t('settings.paperModeActive')
+                    : tradingMode?.mode === 'simulation' ? 'Simulation Mode Active' : t('settings.testnetModeActive')
                   }
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {tradingMode?.mode === 'real'
                     ? t('settings.realModeDesc')
-                    : t('settings.paperModeDesc')}
+                    : tradingMode?.mode === 'simulation' ? 'Testing with real market data, trades executed locally' : t('settings.testnetModeDesc')}
                 </p>
               </div>
 
@@ -375,30 +374,45 @@ export default function Settings() {
               )}
 
               {/* Mode Toggle Buttons */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <Button
-                  variant={tradingMode?.mode === 'paper' ? 'default' : 'outline'}
-                  onClick={() => switchModeMutation.mutate('paper')}
-                  disabled={switchModeMutation.isPending || tradingMode?.mode === 'paper'}
-                  data-testid="button-switch-paper"
-                  className="w-full"
+                  variant={tradingMode?.mode === 'simulation' ? 'default' : 'outline'}
+                  onClick={() => switchModeMutation.mutate('simulation')}
+                  disabled={switchModeMutation.isPending || tradingMode?.mode === 'simulation'}
+                  data-testid="button-switch-simulation"
+                  className="w-full flex flex-col h-auto py-3 px-2"
                 >
                   {switchModeMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  {t('settings.paperTrading')}
+                  <span className="font-semibold text-sm">Simulation</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Local Testing</span>
+                </Button>
+                <Button
+                  variant={tradingMode?.mode === 'testnet' ? 'default' : 'outline'}
+                  onClick={() => switchModeMutation.mutate('testnet')}
+                  disabled={switchModeMutation.isPending || tradingMode?.mode === 'testnet'}
+                  data-testid="button-switch-testnet"
+                  className="w-full flex flex-col h-auto py-3 px-2"
+                >
+                  {switchModeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  <span className="font-semibold text-sm">Testnet</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Paper Trading</span>
                 </Button>
                 <Button
                   variant={tradingMode?.mode === 'real' ? 'destructive' : 'outline'}
                   onClick={() => setShowRealModeDialog(true)}
                   disabled={switchModeMutation.isPending || tradingMode?.mode === 'real'}
                   data-testid="button-switch-real"
-                  className="w-full"
+                  className="w-full flex flex-col h-auto py-3 px-2"
                 >
                   {switchModeMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
-                  {t('settings.realTrading')}
+                  <span className="font-semibold text-sm">Real</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">Live Trading</span>
                 </Button>
               </div>
 

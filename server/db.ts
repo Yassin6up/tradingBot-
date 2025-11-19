@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from "@shared/schema";
+import * as schema from "./types";
 import path from 'path';
 import fs from 'fs';
 
@@ -79,7 +79,7 @@ function initializeTables() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       initial_balance TEXT NOT NULL DEFAULT '10000',
       created_at INTEGER NOT NULL,
-      trading_mode TEXT NOT NULL DEFAULT 'paper',
+      trading_mode TEXT NOT NULL DEFAULT 'simulation',
       real_balance TEXT DEFAULT '0',
       real_balance_updated_at INTEGER,
       real_mode_confirmed_at INTEGER,
@@ -102,20 +102,73 @@ function initializeTables() {
       mode TEXT NOT NULL,
       strategy TEXT NOT NULL,
       opened_at INTEGER NOT NULL,
-      closed_at INTEGER
+      closed_at INTEGER,
+      current_price TEXT,
+      current_profit_percent TEXT
     );
   `);
   
-  // Migrate legacy 'sandbox' mode to 'paper' mode in existing trades
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS ai_logs (
+      id TEXT PRIMARY KEY,
+      timestamp INTEGER NOT NULL,
+      market_conditions TEXT NOT NULL,
+      strategy_scores TEXT NOT NULL,
+      selected_strategy TEXT NOT NULL,
+      previous_strategy TEXT NOT NULL,
+      reasoning TEXT NOT NULL,
+      confidence INTEGER NOT NULL,
+      expected_win_rate INTEGER NOT NULL
+    );
+  `);
+  
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS reddit_sentiment (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL UNIQUE,
+      subreddit TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      author TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      num_comments INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      sentiment_score REAL NOT NULL,
+      sentiment_label TEXT NOT NULL,
+      mentioned_coins TEXT,
+      relevance_score REAL
+    );
+  `);
+  
+  // Migrate legacy modes to new tri-mode system
   try {
-    sqlite.exec(`UPDATE trades SET mode = 'paper' WHERE mode = 'sandbox'`);
+    // 'sandbox' → 'simulation', 'paper' → 'testnet'
+    sqlite.exec(`UPDATE trades SET mode = 'simulation' WHERE mode = 'sandbox'`);
+    sqlite.exec(`UPDATE trades SET mode = 'testnet' WHERE mode = 'paper'`);
+    sqlite.exec(`UPDATE positions SET mode = 'simulation' WHERE mode = 'sandbox'`);
+    sqlite.exec(`UPDATE positions SET mode = 'testnet' WHERE mode = 'paper'`);
+    sqlite.exec(`UPDATE portfolio_settings SET trading_mode = 'simulation' WHERE trading_mode = 'sandbox'`);
+    sqlite.exec(`UPDATE portfolio_settings SET trading_mode = 'testnet' WHERE trading_mode = 'paper'`);
   } catch (e) {
-    // Ignore if table doesn't exist yet or no rows affected
+    // Ignore if tables don't exist yet or no rows affected
+  }
+  
+  // Migrate existing positions table if it exists (add new columns)
+  try {
+    sqlite.exec(`ALTER TABLE positions ADD COLUMN current_price TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    sqlite.exec(`ALTER TABLE positions ADD COLUMN current_profit_percent TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
   }
   
   // Migrate existing portfolio_settings table if it exists (add new columns)
   try {
-    sqlite.exec(`ALTER TABLE portfolio_settings ADD COLUMN trading_mode TEXT NOT NULL DEFAULT 'paper'`);
+    sqlite.exec(`ALTER TABLE portfolio_settings ADD COLUMN trading_mode TEXT NOT NULL DEFAULT 'simulation'`);
   } catch (e) {
     // Column already exists, ignore
   }

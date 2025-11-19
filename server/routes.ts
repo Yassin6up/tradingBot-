@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { tradingEngine } from "./trading-engine";
-import { startBotSchema, changeStrategySchema, saveApiKeysSchema } from "@shared/schema";
+import { startBotSchema, changeStrategySchema, saveApiKeysSchema, type TradingMode } from "./types";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -40,6 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               winningTrades: simulatedPortfolio.winningTrades,
               losingTrades: simulatedPortfolio.losingTrades,
               bestPerformingCoin: simulatedPortfolio.bestPerformingCoin,
+              mode: tradingMode.mode,
               realMode: true,
               assets: simplifiedBalance.assets,
             });
@@ -51,9 +52,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Paper mode or Binance not connected - return simulated balance
+      // Simulation/testnet mode or Binance not connected - return simulated balance
       const portfolio = await storage.getPortfolio();
-      res.json({ ...portfolio, realMode: false });
+      const currentMode = await storage.getTradingMode();
+      res.json({ ...portfolio, mode: currentMode.mode, realMode: currentMode.mode === 'real' });
     } catch (error) {
       console.error('Error fetching portfolio:', error);
       res.status(500).json({ error: 'Failed to fetch portfolio' });
@@ -115,18 +117,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start bot endpoint
   app.post("/api/bot/start", async (req, res) => {
     try {
-      // Check if Binance API is connected before starting bot
-      const { getBinanceService } = await import("./services/binance");
-      const binanceService = getBinanceService();
-      
-      if (!binanceService.isApiConnected()) {
-        return res.status(400).json({ 
-          error: 'Binance API connection required', 
-          message: 'Please configure your Binance API key and secret in Settings before starting the bot.' 
-        });
-      }
-      
+      // Parse request first to get the mode
       const data = startBotSchema.parse(req.body);
+      
+      // Start the bot - this will initialize the appropriate exchange provider
       await tradingEngine.start(data.strategy, data.mode);
       const botState = await storage.getBotState();
       res.json(botState);
@@ -134,8 +128,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Invalid request data', details: error.errors });
       } else {
+        // Use centralized error mapper for exchange errors
+        const { mapExchangeErrorToResponse } = await import("./utils/exchange-error-mapper");
+        const errorResponse = mapExchangeErrorToResponse(error);
         console.error('Error starting bot:', error);
-        res.status(500).json({ error: 'Failed to start bot' });
+        res.status(errorResponse.status).json(errorResponse);
       }
     }
   });
@@ -298,41 +295,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Prices endpoint - Returns real prices if Binance connected, otherwise simulated
+  // Prices endpoint - Returns current prices from trading engine
   app.get("/api/prices", async (_req, res) => {
     try {
-      const { getBinanceService } = await import("./services/binance");
-      const binanceService = getBinanceService();
+      // Get prices from the trading engine (supports all 55 coins)
+      const prices = tradingEngine.getCurrentPrices();
       
-      // Try to get real prices if Binance is connected
-      if (binanceService.isApiConnected()) {
-        try {
-          const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT'];
-          const pricesMap = await binanceService.fetchPrices(symbols);
-          
-          // Convert Map to object
-          const prices: Record<string, number> = {};
-          pricesMap.forEach((price, symbol) => {
-            prices[symbol] = price;
-          });
-          
-          return res.json(prices);
-        } catch (binanceError) {
-          console.warn('Failed to fetch real prices, falling back to simulated:', binanceError);
-          // Fall through to simulated prices
-        }
-      }
-      
-      // Return simulated prices for paper trading
-      const simulatedPrices = {
-        'BTC/USDT': 50000 + (Math.random() - 0.5) * 2000,
-        'ETH/USDT': 3000 + (Math.random() - 0.5) * 200,
-        'BNB/USDT': 400 + (Math.random() - 0.5) * 20,
-        'SOL/USDT': 100 + (Math.random() - 0.5) * 10,
-        'ADA/USDT': 0.5 + (Math.random() - 0.5) * 0.05,
-      };
-      
-      res.json(simulatedPrices);
+      res.json(prices);
     } catch (error) {
       console.error('Error fetching prices:', error);
       res.status(500).json({ error: 'Failed to fetch prices' });
@@ -378,6 +347,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error toggling AI:', error);
       res.status(500).json({ error: 'Failed to toggle AI' });
+    }
+  });
+
+  // Open Positions endpoint - Real-time monitoring of active trades
+  app.get("/api/positions/open", async (req, res) => {
+    try {
+      const mode = req.query.mode as TradingMode | undefined;
+      const openPositions = await storage.getOpenPositions(mode);
+      
+      // Enhance with current prices and P&L for real-time monitoring
+      const { getBinanceService } = await import("./services/binance");
+      const binanceService = getBinanceService();
+      
+      const enhancedPositions = await Promise.all(
+        openPositions.map(async (position) => {
+          try {
+            let currentPrice = position.entryPrice;
+            if (binanceService.isApiConnected()) {
+              currentPrice = await binanceService.fetchPrice(position.symbol);
+            }
+            
+            const currentProfitPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            const currentProfit = (currentPrice - position.entryPrice) * position.quantity;
+            
+            return {
+              ...position,
+              currentPrice,
+              currentProfit,
+              currentProfitPercent,
+              isNearStopLoss: currentPrice <= position.stopLoss * 1.02,
+              isNearTakeProfit: currentPrice >= position.takeProfit * 0.98,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch current price for ${position.symbol}:`, error);
+            return {
+              ...position,
+              currentPrice: position.entryPrice,
+              currentProfit: 0,
+              currentProfitPercent: 0,
+              isNearStopLoss: false,
+              isNearTakeProfit: false,
+            };
+          }
+        })
+      );
+      
+      res.json(enhancedPositions);
+    } catch (error) {
+      console.error('Error fetching open positions:', error);
+      res.status(500).json({ error: 'Failed to fetch open positions' });
+    }
+  });
+
+  // Crypto News endpoint - Fetches latest crypto news from Reddit and other sources
+  app.get("/api/news", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      
+      // Get news from strategy AI (which fetches from Reddit)
+      const { strategyAI } = await import("./services/strategy-ai");
+      
+      // Get market conditions which includes news sentiment
+      const marketConditions = strategyAI.analyzeMarketConditions();
+      
+      // For now, return a structured response with market news summary
+      // In the future, we can expand this to return actual news articles
+      const newsResponse = {
+        marketSentiment: marketConditions.newsSentiment,
+        newsActivity: marketConditions.newsActivity,
+        marketRegime: marketConditions.marketRegime,
+        summary: `Market is showing ${marketConditions.marketRegime} conditions with ${
+          marketConditions.newsSentiment > 10 ? 'bullish' : 
+          marketConditions.newsSentiment < -10 ? 'bearish' : 
+          'neutral'
+        } sentiment. News activity: ${(marketConditions.newsActivity * 100).toFixed(0)}%`,
+        timestamp: Date.now(),
+        // Placeholder for actual news articles - can be expanded later
+        articles: [
+          {
+            id: '1',
+            title: 'Market Analysis',
+            source: 'AI Analysis',
+            sentiment: marketConditions.newsSentiment,
+            relevance: marketConditions.newsActivity * 100,
+            timestamp: Date.now(),
+          }
+        ]
+      };
+      
+      res.json(newsResponse);
+    } catch (error) {
+      console.error('Error fetching crypto news:', error);
+      res.status(500).json({ error: 'Failed to fetch crypto news' });
     }
   });
 
@@ -567,8 +629,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/trading-mode", async (req, res) => {
     try {
-      const { changeTradingModeSchema } = await import("@shared/schema");
+      const { changeTradingModeSchema } = await import("./types");
       const data = changeTradingModeSchema.parse(req.body);
+      
+      // Add confirmation check if switching to real mode
+      if (data.mode === 'real') {
+        if (!data.confirmation) {
+          return res.status(400).json({ 
+            error: 'Confirmation required',
+            message: 'You must explicitly confirm switching to real trading mode. This is a safety feature to prevent accidental real money trading.'
+          });
+        }
+      }
+      
+      // Validate that the requested mode can be initialized (check credentials)
+      // This prevents saving a mode that can't actually be used
+      const { getExchangeProviderManager } = await import("./services/exchange-provider-manager");
+      const exchangeProviderManager = getExchangeProviderManager();
+      await exchangeProviderManager.switchMode(data.mode);
       
       // Prepare trading mode settings
       const modeSettings: any = {
@@ -579,12 +657,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add confirmation timestamp if switching to real mode
       if (data.mode === 'real') {
-        if (!data.confirmation) {
-          return res.status(400).json({ 
-            error: 'Confirmation required',
-            message: 'You must explicitly confirm switching to real trading mode. This is a safety feature to prevent accidental real money trading.'
-          });
-        }
         modeSettings.confirmedAt = new Date();
       }
       
@@ -598,11 +670,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Invalid request data', details: error.errors });
       } else {
+        // Use centralized error mapper for exchange errors
+        const { mapExchangeErrorToResponse } = await import("./utils/exchange-error-mapper");
+        const errorResponse = mapExchangeErrorToResponse(error);
         console.error('Error changing trading mode:', error);
-        res.status(500).json({ 
-          error: 'Failed to change trading mode',
-          message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        res.status(errorResponse.status).json(errorResponse);
       }
     }
   });

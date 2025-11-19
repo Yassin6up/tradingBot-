@@ -6,7 +6,7 @@ import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Brain, TrendingUp, AlertCircle, Activity } from "lucide-react";
-import type { AIDecision } from "@shared/schema";
+import type { AIDecision } from "@/types";
 
 export default function Analytics() {
   const { t } = useTranslation();

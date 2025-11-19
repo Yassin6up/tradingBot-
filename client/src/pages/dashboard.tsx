@@ -9,6 +9,9 @@ import { Navigation } from "@/components/navigation";
 import { LanguageSelector } from "@/components/language-selector";
 import { CoinSelector } from "@/components/coin-selector";
 import { CoinPriceSlider } from "@/components/coin-price-slider";
+import { AILogs } from "@/components/ai-logs";
+import { OpenTrades } from "@/components/open-trades";
+import { CryptoNews } from "@/components/crypto-news";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWebSocket } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +26,7 @@ import {
   PieChart
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Portfolio, BotState, Trade, StrategyType, TradingMode, AIDecision } from "@shared/schema";
+import type { Portfolio, BotState, Trade, StrategyType, TradingMode, AIDecision } from "@/types";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -465,11 +468,13 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Trading Mode</span>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    portfolio?.realMode 
+                    portfolio?.mode === 'real'
                       ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' 
-                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                      : portfolio?.mode === 'testnet'
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                   }`}>
-                    {portfolio?.realMode ? 'REAL' : 'PAPER'}
+                    {portfolio?.mode === 'real' ? 'REAL' : portfolio?.mode === 'testnet' ? 'TESTNET' : 'SIMULATION'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -608,20 +613,36 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Charts and Trade History */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">{t('chart.title') || 'Price Chart'}</h2>
-              <CoinSelector value={selectedCoin} onValueChange={setSelectedCoin} />
+        {/* Two-Column Responsive Dashboard Layout */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6" data-testid="dashboard-main-grid">
+          {/* Main Column - Chart & Trade History (8 cols on xl) */}
+          <div className="xl:col-span-8 space-y-6" data-testid="main-column">
+            {/* Price Chart */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{t('chart.title') || 'Price Chart'}</h2>
+                <CoinSelector value={selectedCoin} onValueChange={setSelectedCoin} />
+              </div>
+              <AdvancedChart 
+                symbol={selectedCoin}
+                defaultTimeframe="5m"
+              />
             </div>
-            <AdvancedChart 
-              symbol={selectedCoin}
-              defaultTimeframe="5m"
-            />
-          </div>
-          <div>
+
+            {/* Trade History */}
             <TradeHistory trades={trades} isLoading={tradesLoading} />
+          </div>
+
+          {/* Monitoring Column - Open Trades, AI Logs, News (4 cols on xl) */}
+          <div className="xl:col-span-4 space-y-6" data-testid="monitoring-column">
+            {/* Open Positions - Real-time monitoring of active trades */}
+            <OpenTrades />
+
+            {/* AI Decision Log - AI reasoning and strategy selection */}
+            <AILogs />
+
+            {/* Crypto News & Market Sentiment */}
+            <CryptoNews />
           </div>
         </div>
       </main>

@@ -1,0 +1,582 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Navigation } from "@/components/navigation";
+import { LanguageSelector } from "@/components/language-selector";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader2, DollarSign, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+export default function Settings() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [apiKey, setApiKey] = useState("");
+  const [secret, setSecret] = useState("");
+  const [testnet, setTestnet] = useState(false);
+  const [showRealModeDialog, setShowRealModeDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+
+  // Query Binance connection status
+  const { data: status } = useQuery<{ connected: boolean; message: string }>({
+    queryKey: ['/api/binance/status'],
+    refetchInterval: 10000,
+  });
+
+  // Query trading mode
+  const { data: tradingMode } = useQuery<{ mode: string; realBalance?: number }>({
+    queryKey: ['/api/trading-mode'],
+    enabled: status?.connected ?? false,
+  });
+
+  // Query real balance
+  const { data: realBalance, refetch: refetchBalance } = useQuery<{ total: number; assets: Record<string, number> }>({
+    queryKey: ['/api/binance/balance'],
+    enabled: false, // Only fetch when user clicks button
+  });
+
+  // Save credentials mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/binance/save-credentials', {
+        apiKey,
+        secret,
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({
+          title: t('common.success'),
+          description: 'API credentials saved successfully and encrypted in database',
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/binance/status'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/trading-mode'] });
+        
+        setApiKey('');
+        setSecret('');
+      } else {
+        toast({
+          title: t('common.error'),
+          description: data.message || 'Failed to save credentials',
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : 'Failed to save credentials',
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Test connection mutation
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/binance/test', {
+        apiKey: apiKey || undefined,
+        secret: secret || undefined,
+        testnet,
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({
+          title: t('common.success'),
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/binance/status'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/trading-mode'] });
+      } else {
+        toast({
+          title: t('common.error'),
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('common.testConnectionFailed'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Switch trading mode mutation
+  const switchModeMutation = useMutation({
+    mutationFn: async (mode: string) => {
+      const response = await apiRequest('POST', '/api/trading-mode', {
+        mode,
+        confirmation: mode === 'real',
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: t('common.success'),
+        description: `Switched to ${data.mode} trading mode`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/trading-mode'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bot/status'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: error.message || 'Failed to switch trading mode',
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reset data mutation
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/reset-data', {});
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: t('common.success'),
+        description: data.message || t('settings.resetSuccess'),
+      });
+      // Invalidate all queries to refresh the application state
+      queryClient.invalidateQueries({ queryKey: [] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('common.error'),
+        description: error.message || t('settings.resetError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleResetData = () => {
+    resetMutation.mutate();
+    setShowResetDialog(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-6 py-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <SettingsIcon className="h-6 w-6 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold" data-testid="text-settings-title">{t('settings.title')}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.subtitle')}
+                </p>
+              </div>
+            </div>
+            <LanguageSelector />
+          </div>
+          <Navigation />
+        </div>
+      </header>
+
+      <main className="container mx-auto px-6 py-6">
+        {/* Binance API Configuration */}
+        <Card className="p-6 mb-6" data-testid="card-binance-config">
+          <div className="flex items-center gap-2 mb-6">
+            <Plug className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">{t('settings.binanceConfig')}</h2>
+            {status && (
+              <Badge
+                variant={status.connected ? "default" : "secondary"}
+                className="ml-auto"
+                data-testid="badge-connection-status"
+              >
+                {status.connected ? (
+                  <><CheckCircle className="h-3 w-3 mr-1" /> {t('settings.connected')}</>
+                ) : (
+                  <><XCircle className="h-3 w-3 mr-1" /> {t('settings.notConnected')}</>
+                )}
+              </Badge>
+            )}
+          </div>
+
+          <div className="space-y-4 mb-6">
+            <div className="p-4 rounded-md bg-muted/30 border border-border">
+              <p className="text-sm text-muted-foreground">
+                <strong>{t('settings.note')}:</strong> {t('settings.binanceNote')}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="api-key">{t('settings.apiKey')}</Label>
+                <Input
+                  id="api-key"
+                  type="password"
+                  placeholder={t('settings.apiKey')}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="mt-1"
+                  data-testid="input-api-key"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="api-secret">{t('settings.apiSecret')}</Label>
+                <Input
+                  id="api-secret"
+                  type="password"
+                  placeholder={t('settings.apiSecret')}
+                  value={secret}
+                  onChange={(e) => setSecret(e.target.value)}
+                  className="mt-1"
+                  data-testid="input-api-secret"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="testnet"
+                  type="checkbox"
+                  checked={testnet}
+                  onChange={(e) => setTestnet(e.target.checked)}
+                  className="rounded"
+                  data-testid="checkbox-testnet"
+                />
+                <Label htmlFor="testnet" className="cursor-pointer">
+                  {t('settings.testnet')}
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              onClick={() => testMutation.mutate()}
+              disabled={testMutation.isPending || !apiKey || !secret}
+              variant="outline"
+              className="flex-1"
+              data-testid="button-test-connection"
+            >
+              {testMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('settings.testing')}
+                </>
+              ) : (
+                <>
+                  <Plug className="mr-2 h-4 w-4" />
+                  {t('settings.testConnection')}
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending || !apiKey || !secret}
+              className="flex-1"
+              data-testid="button-save-credentials"
+            >
+              {saveMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('settings.saving')}
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  {t('settings.saveCredentials')}
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {/* Trading Mode Configuration */}
+        {status?.connected && (
+          <Card className="p-6 mb-6" data-testid="card-trading-mode">
+            <div className="flex items-center gap-2 mb-6">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">{t('settings.tradingMode')}</h2>
+              {tradingMode && (
+                <Badge
+                  variant={tradingMode.mode === 'real' ? "destructive" : "default"}
+                  className="ml-auto"
+                  data-testid="badge-current-mode"
+                >
+                  {tradingMode.mode === 'real' ? t('settings.realModeBadge') : t('settings.paperModeBadge')}
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {/* Current Mode Info */}
+              <div className="p-4 rounded-md bg-muted/30 border border-border">
+                <p className="text-sm font-medium mb-2">
+                  {tradingMode?.mode === 'real' 
+                    ? t('settings.realModeActive')
+                    : t('settings.paperModeActive')
+                  }
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {tradingMode?.mode === 'real'
+                    ? t('settings.realModeDesc')
+                    : t('settings.paperModeDesc')}
+                </p>
+              </div>
+
+              {/* Real Balance Display */}
+              {tradingMode?.mode === 'real' && (
+                <div className="p-4 rounded-md bg-primary/5 border border-primary/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">{t('settings.realBalance')}</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => refetchBalance()}
+                      data-testid="button-refresh-balance"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {realBalance ? (
+                    <div>
+                      <p className="text-2xl font-bold">${realBalance.total} USDT</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Object.keys(realBalance.assets).length} {t('settings.assets')}
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => refetchBalance()}
+                      data-testid="button-fetch-balance"
+                    >
+                      {t('settings.fetchBalance')}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Mode Toggle Buttons */}
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  variant={tradingMode?.mode === 'paper' ? 'default' : 'outline'}
+                  onClick={() => switchModeMutation.mutate('paper')}
+                  disabled={switchModeMutation.isPending || tradingMode?.mode === 'paper'}
+                  data-testid="button-switch-paper"
+                  className="w-full"
+                >
+                  {switchModeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  {t('settings.paperTrading')}
+                </Button>
+                <Button
+                  variant={tradingMode?.mode === 'real' ? 'destructive' : 'outline'}
+                  onClick={() => setShowRealModeDialog(true)}
+                  disabled={switchModeMutation.isPending || tradingMode?.mode === 'real'}
+                  data-testid="button-switch-real"
+                  className="w-full"
+                >
+                  {switchModeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  {t('settings.realTrading')}
+                </Button>
+              </div>
+
+              {/* Safety Warning */}
+              <div className="p-4 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
+                      {t('settings.tradingWarning')}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t('settings.tradingWarningDesc')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Data Reset Section */}
+        <Card className="p-6 mb-6 border-destructive/20" data-testid="card-reset-data">
+          <div className="flex items-center gap-2 mb-4">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            <h2 className="text-lg font-semibold text-destructive">{t('settings.resetData')}</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20">
+              <div className="flex gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-destructive mb-2">
+                    {t('settings.resetWarningTitle')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.resetWarningDesc')}
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 list-disc list-inside space-y-1">
+                    <li>{t('settings.resetWarning1')}</li>
+                    <li>{t('settings.resetWarning2')}</li>
+                    <li>{t('settings.resetWarning3')}</li>
+                    <li>{t('settings.resetWarning4')}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              variant="destructive"
+              onClick={() => setShowResetDialog(true)}
+              disabled={resetMutation.isPending}
+              className="w-full"
+              data-testid="button-reset-data"
+            >
+              {resetMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('settings.resetting')}
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('settings.resetDataButton')}
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {/* Information Card */}
+        <Card className="p-6" data-testid="card-api-info">
+          <h3 className="font-semibold mb-3">{t('settings.howTo')}</h3>
+          <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+            <li>{t('settings.step1')}</li>
+            <li>{t('settings.step2')}</li>
+            <li>{t('settings.step3')}</li>
+            <li>{t('settings.step4')}</li>
+            <li>{t('settings.step5')}</li>
+            <li>{t('settings.step6')}</li>
+            <li>{t('settings.step7')}</li>
+          </ol>
+
+          <div className="mt-4 p-4 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
+              ⚠️ {t('settings.securityWarning')}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t('settings.securityNote')}
+            </p>
+          </div>
+        </Card>
+
+        {/* Real Mode Confirmation Dialog */}
+        <AlertDialog open={showRealModeDialog} onOpenChange={setShowRealModeDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                {t('settings.confirmRealMode')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 text-left">
+                <p className="font-medium text-foreground">
+                  {t('settings.realModeWarning1')}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>{t('settings.realModeWarning2')}</li>
+                  <li>{t('settings.realModeWarning3')}</li>
+                  <li>{t('settings.realModeWarning4')}</li>
+                  <li>{t('settings.realModeWarning5')}</li>
+                </ul>
+                <p className="font-medium text-destructive">
+                  {t('settings.realModeWarning6')}
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-real-mode">
+                {t('common.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={() => {
+                  switchModeMutation.mutate('real');
+                  setShowRealModeDialog(false);
+                }}
+                data-testid="button-confirm-real-mode"
+              >
+                {t('settings.confirmRealModeButton')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reset Data Confirmation Dialog */}
+        <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                {t('settings.confirmResetTitle')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 text-left">
+                <p className="font-medium text-foreground">
+                  {t('settings.confirmResetDesc')}
+                </p>
+                <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm font-medium text-destructive mb-2">
+                    {t('settings.resetIrreversibleWarning')}
+                  </p>
+                  <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                    <li>{t('settings.resetLoss1')}</li>
+                    <li>{t('settings.resetLoss2')}</li>
+                    <li>{t('settings.resetLoss3')}</li>
+                    <li>{t('settings.resetLoss4')}</li>
+                  </ul>
+                </div>
+                <p className="text-sm font-medium text-destructive">
+                  {t('settings.finalConfirmation')}
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-reset">
+                {t('common.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90"
+                onClick={handleResetData}
+                data-testid="button-confirm-reset"
+              >
+                {t('settings.confirmResetButton')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </div>
+  );
+}
